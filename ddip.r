@@ -172,7 +172,7 @@ interpro_algo <- function(protein1, protein2){
 
 
 ui <- fluidPage(
-  titlePanel("Upload and Process TSV Files"),
+  titlePanel("Domain-Domain Interaction Predictor"),
   sidebarLayout(
     sidebarPanel(
       fileInput("file1", "Choose TSV File for Protein 1:", accept = ".tsv"),
