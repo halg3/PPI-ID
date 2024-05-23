@@ -5,7 +5,7 @@ library(dplyr)
 
 compiled_interactions = read.csv("/Users/hvygoodwin/Downloads/DifB_Project/app/ddi_interactions.csv")
 compiled_interactions = na.omit(compiled_interactions)
-write.csv(compiled_interactions, "/Users/hvygoodwin/Downloads/DifB_Project/app/ddi_interactions.csv", row.names = FALSE)
+# write.csv(compiled_interactions, "/Users/hvygoodwin/Downloads/DifB_Project/app/ddi_interactions.csv", row.names = FALSE)
 
 interaction_id <- read_tsv("/Users/hvygoodwin/Downloads/DifB_Project/app/domine-tables-2.0/elm_interaction_domains.tsv")
 colnames(interaction_id) <- c("elm_identifier", "interaction_domain_id", "interaction_domain_description", "interaction_domain_name")
@@ -19,11 +19,14 @@ table_titles <- read_tsv("/Users/hvygoodwin/Downloads/table_titles - Sheet2.tsv"
 slim_pfam <- function(protein){
   pfam_id = c()
   
+  # Only keeps SLiM names that are also found in interaction_id. interaction_id is from the ELM database, and it 
+  # provides identifying information for SLiMs.
   keep = intersect(protein$slim, interaction_id$elm_identifier)
   protein_filtered = protein[protein$slim %in% keep, ]
   
   slim = protein_filtered$slim
   range = protein_filtered$range
+  prob = protein_filtered$probability
   
   for(motif in protein_filtered$slim){
     for(i in 1:nrow(interaction_id)){
@@ -33,19 +36,14 @@ slim_pfam <- function(protein){
       }
     }
   }
-  return(data.frame(slim, ID = pfam_id, range))
+  return(data.frame(slim, ID = pfam_id, range, prob))
 }
  
-
 elm_algo <- function(protein1, protein2){
-  domain_name_1 = c()
-  domain_name_2 = c()
-  domain_range_1 = c()
-  domain_range_2 = c()
   
   table_names = c("slim", "sequence", "range", "misc", "description", "location", "pattern", "phi", "structure", "probability")
   default_table_names = c("Elm Name", "Instances (Matched Sequence)", "Positions", "View in Jmol", "Elm Description", "Cell Compartment", "Pattern", "PHI-Blast Instance Mapping", "Structural Filter Info", "Probability")
-
+  
   if(ncol(protein1) != 10 | ncol(protein2) != 10){
     return("Please ensure that ELM results for both proteins are submitted")
   } else {
@@ -82,35 +80,54 @@ elm_algo <- function(protein1, protein2){
     domain_name_2 = c()
     domain_range_1 = c()
     domain_range_2 = c()
-
+    combined_prob = c()
+    
     for(domain1 in 1:nrow(protein1_cleaned)){
       for(domain2 in 1:nrow(protein2_cleaned)){
         if(protein1_cleaned$ID[domain1] %in% compiled_interactions$domain_1){
           poi1 = compiled_interactions[compiled_interactions$domain_1 == protein1_cleaned$ID[domain1], ]
           if(protein2_cleaned$ID[domain2] %in% poi1$domain_2){
+            prob_1 = c()
+            prob_2 = c()
+            
             domain_name_1 = c(domain_name_1, protein1_cleaned$slim[domain1])
             domain_range_1 = c(domain_range_1, protein1_cleaned$range[domain1])
+            prob_1 = c(prob_1, as.numeric(protein1_cleaned$prob[domain1]))
             
             domain_name_2 = c(domain_name_2, protein2_cleaned$slim[domain2])
             domain_range_2 = c(domain_range_2, protein2_cleaned$range[domain2])
+            prob_2 = c(prob_2, as.numeric(protein2_cleaned$prob[domain2]))
+            
+            combined_prob = c(combined_prob, prob_1 * prob_2)
           }
         }
         if(protein1_cleaned$ID[domain1] %in% compiled_interactions$domain_2){
           poi1 = compiled_interactions[compiled_interactions$domain_2 == protein1_cleaned$ID[domain1], ]
           if(protein2_cleaned$ID[domain2] %in% poi1$domain_1){
+            prob_1 = c()
+            prob_2 = c()
+            
             domain_name_1 = c(domain_name_1, protein1_cleaned$slim[domain1])
             domain_range_1 = c(domain_range_1, protein1_cleaned$range[domain1])
+            prob_1 = c(prob_1, as.numeric(protein1_cleaned$prob[domain1]))
             
             domain_name_2 = c(domain_name_2, protein2_cleaned$slim[domain2])
             domain_range_2 = c(domain_range_2, protein2_cleaned$range[domain2])
+            prob_2 = c(prob_2, as.numeric(protein2_cleaned$prob[domain2]))
+            
+            combined_prob = c(combined_prob, prob_1 * prob_2)
           }
         }
       }
     }
   }
-  final_table = data.frame(domain_name_1, domain_name_2, domain_range_1, domain_range_2)
-  colnames(final_table) <- c("Domain 1", "Domain 2", "Domain 1 Range(s)", "Domain 2 Range(s)")
-  return(unique(final_table))
+  unsorted_table = unique(data.frame(domain_name_1, domain_name_2, domain_range_1, domain_range_2, combined_prob))
+  
+  indices = order(unsorted_table$combined_prob, decreasing = FALSE)
+  final_table = unsorted_table[indices,]
+  colnames(final_table) <- c("SLiM 1", "SLiM 2", "SLiM 1 Range(s)", "SLiM 2 Range(s)", "Combined Probability")
+  row.names(final_table) = NULL
+  return(final_table)
 }
 
 interpro_algo <- function(protein1, protein2){
@@ -172,40 +189,46 @@ interpro_algo <- function(protein1, protein2){
 
 
 ui <- fluidPage(
-  titlePanel("Domain-Domain Interaction Predictor"),
-  sidebarLayout(
-    sidebarPanel(
-      fileInput("file1", "Choose TSV File for Protein 1:", accept = ".tsv"),
-      fileInput("file2", "Choose TSV File for Protein 2:", accept = ".tsv"),
-      radioButtons("database", "Select Database",
-                   choices = list("InterPro" = "interpro", "ELM" = "elm")),
-      actionButton("analyze", "Analyze"),
-      downloadButton("downloadData", "Download Processed Data")
+  titlePanel("Domain-Domain Interaction Prediction"),
+  tabsetPanel(
+    tabPanel("Predict",
+             sidebarLayout(
+               sidebarPanel(
+                 fileInput("file1", "Choose TSV File for Protein 1:", accept = ".tsv"),
+                 fileInput("file2", "Choose TSV File for Protein 2:", accept = ".tsv"),
+                 radioButtons("database", "Select Database",
+                              choices = list("InterPro" = "interpro", "ELM" = "elm"))
+               ),
+               mainPanel(
+                 DTOutput("dataTable")
+               )
+             )
     ),
-    mainPanel(
-      DTOutput("dataTable")
+    tabPanel("About",
+             h3("About"),
+             h3("Help"),
+             h3("References"),
+             p("Test"),
+             p("Test")
     )
   )
 )
 
 server <- function(input, output, session){
-  results <- reactiveVal(data.frame())
-  
-  observeEvent(input$analyze, {
+  output$dataTable <- renderDT({
+    
     req(input$file1)
     req(input$file2)
     
-    # Read input files
-    protein1 <- read_tsv(input$file1$datapath)
-    protein2 <- read_tsv(input$file2$datapath)
+    protein1 = read_tsv(input$file1$datapath)
+    protein2 = read_tsv(input$file2$datapath)
     
-    # Placeholder for domain interaction algorithm
-    if (input$database == "interpro") {
-      # Implement the InterPro specific algorithm
-      results(interpro_algo(protein1, protein2))
-    } else if (input$database == "elm") {
-      # Implement the ELM specific algorithm
-      results(elm_algo(protein1, protein2))
+    if(input$database == "interpro"){
+      return(interpro_algo(protein1, protein2))
+    } else if(input$database == "elm"){
+      return(elm_algo(protein1, protein2))
     }
   })
 }
+
+shinyApp(ui = ui, server = server)
