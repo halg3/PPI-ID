@@ -3,6 +3,7 @@ library(DT)
 library(readr)
 library(dplyr)
 
+ppidm = read.csv("/Users/hvygoodwin/Downloads/DifB_Project/app/PPIDM_FullSortedDataset_84K_GSB.csv")
 compiled_interactions = read.csv("/Users/hvygoodwin/Downloads/DifB_Project/app/ddi_interactions.csv")
 compiled_interactions = na.omit(compiled_interactions)
 # write.csv(compiled_interactions, "/Users/hvygoodwin/Downloads/DifB_Project/app/ddi_interactions.csv", row.names = FALSE)
@@ -197,7 +198,8 @@ ui <- fluidPage(
                  fileInput("file1", "Choose TSV File for Protein 1:", accept = ".tsv"),
                  fileInput("file2", "Choose TSV File for Protein 2:", accept = ".tsv"),
                  radioButtons("database", "Select Database",
-                              choices = list("InterPro" = "interpro", "ELM" = "elm"))
+                              choices = list("InterPro" = "interpro", "ELM" = "elm")),
+                 downloadButton("downloadData", "Download Results")
                ),
                mainPanel(
                  DTOutput("dataTable")
@@ -206,6 +208,7 @@ ui <- fluidPage(
     ),
     tabPanel("About",
              h3("About"),
+             h4("This work?"),
              h3("Help"),
              h3("References"),
              p("Test"),
@@ -215,20 +218,32 @@ ui <- fluidPage(
 )
 
 server <- function(input, output, session){
-  output$dataTable <- renderDT({
-    
+  results <- reactive({
     req(input$file1)
     req(input$file2)
     
-    protein1 = read_tsv(input$file1$datapath)
-    protein2 = read_tsv(input$file2$datapath)
+    protein1 <- read_tsv(input$file1$datapath)
+    protein2 <- read_tsv(input$file2$datapath)
     
-    if(input$database == "interpro"){
-      return(interpro_algo(protein1, protein2))
-    } else if(input$database == "elm"){
-      return(elm_algo(protein1, protein2))
+    if (input$database == "interpro") {
+      interpro_algo(protein1, protein2)
+    } else if (input$database == "elm") {
+      elm_algo(protein1, protein2)
     }
   })
+  
+  output$dataTable <- renderDT({
+    results()
+  })
+  
+  output$downloadData <- downloadHandler(
+    filename = function() {
+      paste("ddip-prediction", Sys.Date(), ".tsv", sep = "")
+    },
+    content = function(file) {
+      write_tsv(results(), file)
+    }
+  )
 }
 
 shinyApp(ui = ui, server = server)
