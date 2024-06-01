@@ -11,8 +11,11 @@ One is able to run this Shiny app from RStudios. To use, simply download the ddi
 
 ## References
 Raghavachari B, Tasneem A, Przytycka T, and Jothi R. (2008). "DOMINE: A database of protein domain interactions." _Nucl. Acids Res., 36 (Database Issue)_, D656-661, doi: 10.1093/nar/gkm761.
+
 Rego N, Koes D. (2015). "3Dmol.js: molecular visualization with WebGL." _Bioinformatics, 31_(8):1322–1324, doi: 10.1093/bioinformatics/btu829.
+
 Roberto Mosca, Arnaud Ceol, Amelie Stein, Roger Olivella & Patrick Aloy. (2014) "3did: a catalogue of domain-based interactions of known three-dimensional structure." _Nucl. Acids Res., 42_(D1):D374-D379, doi: 10.1093/nar/gkt887.
+
 Yellaboina S, Tasneem A, Zaykin DV, Raghavachari B, and Jothi R. (2011). "DOMINE: A comprehensive collection of known and predicted domain-domain interactions." _Nucl. Acids Res., 39 (Database Issue)_, D730-735, doi: 10.1093/nar/gkq1229.
 
 ## Collaborators:
