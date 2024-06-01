@@ -7,7 +7,7 @@ After running predictions on AlphaFold, the user is able to upload the resulting
 This tool takes advantage of a compiled dataset of domain-domain interactions from the 3did and DOMINE databases. As a result, domains/SLiMs are identified by their Pfam ID, and interactions are determined according to the appropriate algorithm implemented in the R script.
 
 ## To Use
-One is able to run this Shiny app from RStudios. To use, simply download the ddip.r script as well as the ddi_interactions.csv and elm_interaction_domains.tsv files. Copy and paste the file path name at the appropriate spot in the script, which will be annotated in-script for ease of identification. Afterwards, one is able to run the entire script to use the tool. I am currently working on getting the tool published on a server so that anyone can access the app directly from a link, without having to execute any code on RStudios.
+One is able to run this Shiny app from RStudios. To use, simply download the ddip.r script as well as the compiled_interactions.csv and interaction_id.tsv files. Copy and paste the file path name at the appropriate spot in the script, which will be annotated in-script for ease of identification. Afterwards, one is able to run the entire script to use the tool. I am currently working on getting the tool published on a server so that anyone can access the app directly from a link, without having to execute any code on RStudios.
 
 ## Collaborators:
 Haley Vy Goodwin
