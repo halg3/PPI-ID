@@ -5,10 +5,8 @@ library(dplyr)
 library(r3dmol)
 library(bio3d)
 
-ppidm = read.csv("/Users/hvygoodwin/Downloads/DifB_Project/app/PPIDM_FullSortedDataset_84K_GSB.csv")
-compiled_interactions = read.csv("/Users/hvygoodwin/Downloads/DifB_Project/app/ddi_interactions.csv")
-compiled_interactions = na.omit(compiled_interactions)
-# write.csv(compiled_interactions, "/Users/hvygoodwin/Downloads/DifB_Project/app/ddi_interactions.csv", row.names = FALSE)
+# Paste path name to ddi_interactions.csv here
+compiled_interactions = read.csv("/paste/path/to/ddi_interactions.csv")
 
 interaction_id <- read_tsv("/Users/hvygoodwin/Downloads/DifB_Project/app/domine-tables-2.0/elm_interaction_domains.tsv")
 colnames(interaction_id) <- c("elm_identifier", "interaction_domain_id", "interaction_domain_description", "interaction_domain_name")
@@ -32,6 +30,7 @@ db_id = function(protein){
   
   return(db)
 }
+
 
 slim_pfam <- function(protein){
   pfam_id = c()
