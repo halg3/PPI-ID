@@ -9,5 +9,9 @@ This tool takes advantage of a compiled dataset of domain-domain interactions fr
 ## To Use
 One is able to run this Shiny app from RStudios. To use, simply download the ddip.r script as well as the compiled_interactions.csv and interaction_id.tsv files. Copy and paste the file path name at the appropriate spot in the script, which will be annotated in-script for ease of identification. Afterwards, one is able to run the entire script to use the tool. I am currently working on getting the tool published on a server so that anyone can access the app directly from a link, without having to execute any code on RStudios.
 
+## References
+Roberto Mosca, Arnaud Ceol, Amelie Stein, Roger Olivella & Patrick Aloy. (2014) "3did: a catalogue of domain-based interactions of known three-dimensional structure"
+_Nucl. Acids Res. 42_(D1):D374-D379, doi:10.1093/nar/gkt887.
+
 ## Collaborators:
 Haley Vy Goodwin
