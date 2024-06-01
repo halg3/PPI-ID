@@ -10,7 +10,7 @@ library(bio3d)
 compiled_interactions = read.csv("/paste/path/to/compiled_interactions.csv")
 
 # Paste path name to interaction_id.tsv here
-interaction_id <- read_tsv("/paste/path/to/interaction_id.tsv")
+interaction_id = read_tsv("/paste/path/to/interaction_id.tsv")
 
 # A number of custom functions made to execute the function of this script:
 # Function that identifies which tool (InterPro or ELM) was used to generate protein domain/slim information.
