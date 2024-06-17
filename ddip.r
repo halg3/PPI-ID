@@ -4,6 +4,8 @@ library(readr)
 library(dplyr)
 library(r3dmol)
 library(bio3d)
+library(pheatmap)
+library(reshape2)
 
 # File upload:
 # Paste path name to compiled_interactions.csv here
@@ -444,6 +446,78 @@ multi_range_conversion = function(range){
   return(ranges_correct)
 }
 
+# Used in binner function to determine the floor to the hundreds place for a range of amino acids. eg. the 
+# hundreds floor of range 150-250 is 100.
+hund_floor <- function(num){
+  multiplier = floor(num/100)
+  return(100 * multiplier)
+}
+
+# Used in binner function to determine the ceiling to the hundreds place for a range of amino acids. eg. the
+# hundreds ceiling of range 150-250 is 300.
+hund_ceiling <- function(num){
+  multiplier = ceiling(num/100)
+  return(100 * multiplier)
+}
+
+# Takes the amino acids as a string and determines the 'bins' to the hundreds place. eg. the hundreds bins of the
+# range 150-250 (floor = 100, ceiling = 300) would be 100, 200, 300.
+binner <- function(range_as_string){
+  nums = as.numeric(unlist(strsplit(range_as_string, split = "-")))
+  
+  mini = min(nums)
+  mini = hund_floor(mini)
+  maxi = max(nums)
+  maxi = hund_ceiling(maxi)
+  
+  counter = mini
+  bins = c()
+  while(counter <= maxi){
+    bins = c(bins, counter)
+    counter = counter + 100
+  }
+  return(bins)
+}
+
+# Handles instances when there are more than 1 range in a cell. This largely occurs due to the over-prediction of
+# SLiMs.
+range_unpacker <-function(split_ranges){
+  all_bins = c()
+  for(i in 1:length(split_ranges)){
+    all_bins = c(all_bins, binner(split_ranges[i]))
+  }
+  return(all_bins)
+}
+
+# Compiles a data frame of all interacting 'bins' between the two proteins. This is used to create a table, which
+# is then used to create the heat map.
+bin_dataframe <- function(results){
+  r1 = results[,'Range 1']
+  r2 = results[,'Range 2']
+  ranges = cbind(r1, r2)
+  total_dataframe = data.frame()
+  
+  for(i in 1:nrow(ranges)){
+    split_ranges1 = unlist(strsplit(ranges[i,1], ', '))
+    split_ranges2 = unlist(strsplit(ranges[i,2], ', '))
+    
+    unpacked_ranges1 = range_unpacker(split_ranges1)
+    unpacked_ranges2 = range_unpacker(split_ranges2)
+    
+    row_numbers = length(unpacked_ranges1) * length(unpacked_ranges2)
+    
+    for(i in 1:length(unpacked_ranges1)){
+      for(j in 1:length(unpacked_ranges2)){
+        new_row = data.frame(unpacked_ranges1[i], unpacked_ranges2[j])
+        colnames(new_row) <- c("Protein 1", "Protein 2")
+        
+        total_dataframe = rbind(total_dataframe, new_row)
+      }
+    }
+  }
+  return(total_dataframe)
+}
+
 # User interface
 ui <- fluidPage(
   titlePanel("Domain-Domain Interaction Prediction"),
@@ -453,13 +527,26 @@ ui <- fluidPage(
                sidebarPanel(
                  fileInput("file1", "Choose TSV File for Protein 1:", accept = ".tsv"),
                  fileInput("file2", "Choose TSV File for Protein 2:", accept = ".tsv"),
+                 fluidRow(
+                   column(6, actionButton("show", "Show Predictions Heat Map", style = "width: 200px;")),
+                   column(6, actionButton("hide", "Hide Predictions Heat Map", style = "width: 200px;"))
+                 ),
+                 p(" "),
                  downloadButton("downloadData", "Download Results"),
                  tags$hr(style = "border-top: 1px solid #444444;"),
                  numericInput("numericFilter", "Only Show Probabilities Less Than...", min = 0, max = 1, value = NULL, step = 1e-10),
                  tags$hr(style = "border-top: 1px solid #444444;"),
                  fileInput("pdb", "Choose PDB file for Multimer", accept = ".pdb"),
+                 fluidRow(
+                   column(6, actionButton("showpdb", "Show PDB", style = "width: 200px;")),
+                   column(6, actionButton("hidepdb", "Hide PDB", style = "width: 200px;"))
+                 ),
+                 p(" "),
                  actionButton("refreshPdb", "Revert Model to Original"),
                  tags$hr(style = "border-top: 1px solid #444444;"),
+                 tags$h5("Heat Map Axes:"),
+                 tags$h6("Vertical Axis - Protein 1", style = "font-weight: 350;"),
+                 tags$h6("Horizontal Axis - Protein 2", style = "font-weight: 350;"),
                  tags$h5("3D Molecular Model Color Key:"),
                  tags$h6(tags$span(style = "color: hotpink;", "Protein 1"),
                          tags$span(style = "color: #00cc96;", "Protein 2"))
@@ -467,6 +554,10 @@ ui <- fluidPage(
                mainPanel(
                  DTOutput("dataTable"),
                  uiOutput("message"),
+                 conditionalPanel(
+                   condition = "output.plotVisible == true",
+                   plotOutput("heatmap"),
+                 ),
                  r3dmolOutput("structure3d")
                )
              )
@@ -486,8 +577,7 @@ ui <- fluidPage(
 server <- function(input, output, session){
   error_message = reactiveVal(NULL)
 
-  # Produces initial data frame after 2 valid tsv files have been uploaded. If 1+ invalid tsv files are uploaded, an error 
-  # message is produced.
+  # Reactive value: data frame of domains/motifs that are predicted as potential interaction partners
   results <- reactive({
     req(input$file1)
     req(input$file2)
@@ -513,13 +603,31 @@ server <- function(input, output, session){
     }
   })
 
-  # Display resulting data frame
+  # Reactive value: data frame of all of the 100 amino acid long windows of potential interacting parterns used to generate heat map.
+  final_df <- reactive({
+    res_df <- results()
+    req(res_df)
+    bin_dataframe(res_df)
+  })
+
+  # Reactive value: final_df as a table that is used to generate heat map
+  final_table <- reactive({
+    df <- final_df()
+    req(df)
+    # Create contingency table using dcast
+    dt <- dcast(df, `Protein 1` ~ `Protein 2`, length)
+    # Set row names from the first column (Protein 1)
+    row.names(dt) <- dt[, 1]
+    # Remove the first column (Protein 1) if not needed in the heatmap
+    dt <- dt[, -1]
+    return(dt)
+  })
+  
   output$dataTable <- renderDT({
     datatable(results(), selection = 'single')
   })
 
-  # Allows one to apply a probability filter to the table (only interactions with a combined probability less than x will
-  # populate the table)
+  # Allows the user to input a probability filter.
   observeEvent(input$numericFilter, {
     if (!is.null(input$numericFilter) && !is.na(input$numericFilter) && input$numericFilter != "") {
       filteredData <- results()
@@ -539,7 +647,7 @@ server <- function(input, output, session){
     }
   })
 
-  # Display messages (either error message, or notifies user no interactions were detected).
+  # Generates either 1. an error message if a non-valid TSV is uploaded or 2. a message that says no interactions are predicted.
   output$message <- renderUI({
     msg <- error_message()
     outcome <- results()
@@ -551,7 +659,7 @@ server <- function(input, output, session){
     }
   })
 
-  # Allows user to download resulting data table
+  # Allows user to download resulting data frame.
   output$downloadData <- downloadHandler(
     filename = function() {
       paste("ddip-prediction", Sys.Date(), ".tsv", sep = "")
@@ -560,11 +668,56 @@ server <- function(input, output, session){
       write_tsv(results(), file)
     }
   )
+
+  # Reactive value: boolean value that is used to allow user to hide/show heat map.
+  plotVisible <- reactiveVal(FALSE)
+
+  observeEvent(input$show, {
+    plotVisible(TRUE)
+  })
   
+  observeEvent(input$hide, {
+    plotVisible(FALSE)
+  })
+  
+  output$plotVisible <- reactive({
+    plotVisible()
+  })
+  
+  outputOptions(output, "plotVisible", suspendWhenHidden = FALSE)
+
+  # Display heat map
+  output$heatmap <- renderPlot({
+    req(plotVisible())
+    req(final_table())
+    
+    ft <- final_table()
+    pheatmap(ft,
+             clustering_method = "none",  # Turn off clustering
+             main = "",
+             fontsize = 10,  # Adjust font size
+             cellwidth = 30,  # Adjust cell width
+             cellheight = 30,  # Adjust cell height
+             cluster_cols = FALSE,  # Turn off clustering for columns
+             cluster_rows = FALSE,  # Turn off clustering for rows
+             scale = "none",  # Do not scale the data
+             border_color = NA,  # Remove border color
+             show_rownames = TRUE,  # Show row names
+             show_colnames = TRUE,  # Show column names
+             annotation_names_row = TRUE,  # Show row annotation names
+             annotation_names_col = TRUE,  # Show column annotation names
+             annotation_legend = TRUE  # Show annotation legend
+    )
+  })
+
+  # Reactive values: needed for 3D visualization of PDB files, identification of chains within PDB files, and for 
+  # allowing the user to hide/show PDB structure after one has been uploaded.
   pdb_data = reactiveVal(NULL)
   chains = reactiveVal(NULL)
+  hide_pdb = reactiveVal(FALSE)
+  showing_pdb = reactiveVal(TRUE)
 
-  # Allows user to upload, view, and interact with PDB files
+  # Automatically displays structure after upload
   observeEvent(input$pdb, {
     req(input$pdb)
     pdb_file <- input$pdb$datapath
@@ -601,8 +754,9 @@ server <- function(input, output, session){
     })
   })
 
-  # Changes the color of selected amino acid ranges
+  # Allows user to interact with 3D model using the table of potential interactions
   observeEvent(input$dataTable_rows_selected, {
+    req(showing_pdb())
     selected_row <- input$dataTable_rows_selected
     if(length(selected_row) > 0){
       selected_data <- results() [selected_row, ]
@@ -663,9 +817,64 @@ server <- function(input, output, session){
     }
   })
 
-  # Reverts coloration of PDB structure back to the original
+  # Show PDB button
+  observeEvent(input$showpdb, {
+    showing_pdb(TRUE)
+    req(input$pdb)
+    
+    output$structure3d <- renderR3dmol({
+      r3dmol(  
+        viewer_spec = m_viewer_spec(
+          cartoonQuality = 10,
+          lowerZoomLimit = 50,
+          upperZoomLimit = 350
+        )
+      ) %>%
+        m_add_model(
+          data = pdb_data(), 
+          format = "pdb"
+        ) %>%
+        m_set_style(
+          sel = m_sel(chain = chains()[1]),
+          style = m_style_cartoon(
+            color = "hotpink"
+          )
+        ) %>%
+        m_set_style(
+          sel = m_sel(chain = chains()[2]),
+          style = m_style_cartoon(
+            color = "#00cc96"
+          )
+        ) %>%
+        m_zoom_to()
+    })
+  })
+
+  # Hide PDB button
+  observeEvent(input$hidepdb, {
+    hide_pdb(TRUE)
+    showing_pdb(FALSE)
+    req(hide_pdb())
+    
+    output$structure3d <- renderR3dmol({
+      r3dmol(
+        viewer_spec = m_viewer_spec(
+          cartoonQuality = 10,
+          lowerZoomLimit = 50,
+          upperZoomLimit = 350
+        )
+      ) %>%
+        m_add_model(
+          data = NULL,
+          format = "pdb"
+        )
+    })
+  })
+
+  # Allows user to refresh PDB file to original state
   observeEvent(input$refreshPdb, {
     req(input$pdb)
+    req(showing_pdb())
     
     output$structure3d <- renderR3dmol({
       r3dmol(  
