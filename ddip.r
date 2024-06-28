@@ -1,9 +1,11 @@
 library(shiny)
+library(shinycssloaders)
 library(DT)
 library(readr)
+library(stringr)
 library(dplyr)
-library(r3dmol)
-library(bio3d)
+library(r3dmol) # (Su & Johnston)
+library(bio3d) # (Grant, et al.)
 library(pheatmap)
 library(reshape2)
 
@@ -326,7 +328,7 @@ mixed_algo = function(protein1, protein2, prot_db_1){
       unsorted_table = unique(data.frame(domain_name_1, domain_name_2, domain_range_1, domain_range_2, combined_prob))
       indices = order(unsorted_table$combined_prob, decreasing = FALSE)
       final_table = unsorted_table[indices,]
-      colnames(final_table) <- c("Domain 1", "SLiM 2", "Range 1", "Range 2", "Combined Probability")
+      colnames(final_table) <- c("Protein 1", "Protein 2", "Range 1", "Range 2", "Combined Probability")
       row.names(final_table) = NULL
       return(final_table)
     } else {
@@ -468,7 +470,7 @@ binner <- function(range_as_string){
   mini = min(nums)
   mini = hund_floor(mini)
   maxi = max(nums)
-  maxi = hund_ceiling(maxi)
+  maxi = hund_floor(maxi)
   
   counter = mini
   bins = c()
@@ -497,9 +499,9 @@ bin_dataframe <- function(results){
   ranges = cbind(r1, r2)
   total_dataframe = data.frame()
   
-  for(i in 1:nrow(ranges)){
-    split_ranges1 = unlist(strsplit(ranges[i,1], ', '))
-    split_ranges2 = unlist(strsplit(ranges[i,2], ', '))
+  for(k in 1:nrow(ranges)){
+    split_ranges1 = unlist(strsplit(ranges[k,1], ', '))
+    split_ranges2 = unlist(strsplit(ranges[k,2], ', '))
     
     unpacked_ranges1 = range_unpacker(split_ranges1)
     unpacked_ranges2 = range_unpacker(split_ranges2)
@@ -515,10 +517,15 @@ bin_dataframe <- function(results){
       }
     }
   }
+  
+  # total_dataframe = total_dataframe[!(total_dataframe$`Protein 1` == max(total_dataframe$`Protein 1`) | total_dataframe$`Protein 2` == max(total_dataframe$`Protein 2`)), ]
+  
   return(total_dataframe)
 }
 
-# Filters data frame by PDB contact distances, if a PDB file is provided.
+# Filters data frame by PDB contact distances, if a PDB file is provided. Updated version of the function provides
+# information on specific residues that are coming in contact. Functions from the Bio3D (Grant, et al.) library 
+# was used in this function.
 filter_by_distance <- function(df, pdb_object, distance, chains){
   inds = atom.select(pdb_object, 'calpha')
   cont_map = cmap(pdb_object$xyz[inds$xyz], dcut = distance, scut = 10, rmgaps = TRUE)
@@ -533,7 +540,9 @@ filter_by_distance <- function(df, pdb_object, distance, chains){
   interacting_A = interacting_pairs[interacting_pairs$row <= length(seq_A), ]
   interacting_AB = interacting_A[interacting_A$col > length(seq_A), ]
   
-  filtered_df = data.frame(matrix(ncol=5,nrow=0))
+  df$'Residue 1' = NA
+  df$'Residue 2' = NA
+  filtered_df = data.frame(matrix(ncol=7,nrow=0))
   colnames(filtered_df) = colnames(df)
   
   if(nrow(interacting_AB) != 0){
@@ -555,6 +564,8 @@ filter_by_distance <- function(df, pdb_object, distance, chains){
       
       for(j in 1:nrow(interacting_AB)){
         if(interacting_AB$row[j] %in% range1 && (interacting_AB$col[j] - length(seq_A)) %in% range2){
+          df$'Residue 1'[i] = interacting_AB$row[j]
+          df$'Residue 2'[i] = (interacting_AB$col[j] - length(seq_A))
           filtered_df = rbind(filtered_df, df[i, ])
           break
         }
@@ -564,6 +575,43 @@ filter_by_distance <- function(df, pdb_object, distance, chains){
   
   return(filtered_df)
 }
+
+# For SLiMs that may be over-predicted, this function reduces the amount of displayed slims to ONLY what is
+# in contact based on contact filter applied.
+clean_filtered_rows = function(filtered_df){
+  cleaned_df = data.frame(matrix(ncol = 7, nrow = 0))
+  colnames(cleaned_df) = colnames(filtered_df)
+  for(i in 1:nrow(filtered_df)){
+    rg1 = unlist(strsplit(filtered_df$`Range 1`[i], ', '))
+    rg2 = unlist(strsplit(filtered_df$`Range 2`[i], ', '))
+    new_row = filtered_df[i, ]
+    ran1 = c()
+    ran2 = c()
+    for(j in 1:length(rg1)){
+      if(filtered_df$`Residue 1`[i] %in% range_conversion(rg1[j])){
+        ran1 = c(ran1, rg1[j])
+        if(length(ran1) > 1){
+          ran1 = paste0(ran1, collapse = ", ")
+        }
+      }
+    }
+    for(k in 1:length(rg2)){
+      if(filtered_df$`Residue 2`[i] %in% range_conversion(rg2[k])){
+        ran2 = c(ran2, rg2[k])
+        if(length(ran2) > 1){
+          ran2 = paste0(ran2, collapse = ", ")
+        }
+      }
+    }
+    new_row$`Range 1` = ran1
+    new_row$`Range 2` = ran2
+    
+    cleaned_df = rbind(cleaned_df, new_row)
+  }
+  
+  return(cleaned_df)
+}
+
 
 # User interface
 ui <- fluidPage(
@@ -596,6 +644,10 @@ ui <- fluidPage(
                    column(6, actionButton("cdFilter", "Filter", style = "width: 200px;")),
                    column(6, actionButton("cdRevert", "Revert", style = "width: 200px;"))
                  ),
+                 fluidRow(
+                   column(6, actionButton("cdLabel", "Add Contact Labels", style = "width: 200px;")),
+                   column(6, actionButton("cdRemLabel", "Remove Contact Labels", style = "width: 200px;"))
+                 ),
                  tags$hr(style = "border-top: 1px solid #444444;"),
                  tags$h5("Heat Map Axes:"),
                  tags$h6("Vertical Axis - Protein 1", style = "font-weight: 350;"),
@@ -609,7 +661,7 @@ ui <- fluidPage(
                  uiOutput("message"),
                  conditionalPanel(
                    condition = "output.plotVisible == true",
-                   plotOutput("heatmap"),
+                   withSpinner(plotOutput("heatmap")),
                  ),
                  r3dmolOutput("structure3d")
                )
@@ -657,7 +709,7 @@ server <- function(input, output, session){
     }
   })
   
-  # Reactive value: data frame of all of the 100 amino acid long windows of potential interacting parterns used to generate heat map.
+  # Reactive value: data frame of all of the 100 amino acid long windows of potential interacting patterns used to generate heat map.
   final_df <- reactive({
     res_df <- results()
     req(res_df)
@@ -771,9 +823,11 @@ server <- function(input, output, session){
   # allowing the user to hide/show PDB structure after one has been uploaded.
   pdb_data = reactiveVal(NULL)
   pdb_object = reactiveVal(NULL)
+  pdb_window = reactiveVal(NULL)
   chains = reactiveVal(NULL)
   hide_pdb = reactiveVal(FALSE)
   showing_pdb = reactiveVal(TRUE)
+  pres_res = reactiveVal(NULL)
   
   # Automatically displays structure after upload
   observeEvent(input$pdb, {
@@ -786,7 +840,8 @@ server <- function(input, output, session){
     pdb_object(nr_pdb_object)
     chains(unique(pdb_object()$atom$chain))
     
-    output$structure3d <- renderR3dmol({
+    # PDB model rendering was done using functions from the r3dmol library (Su & Johnston).
+    pdb_window(
       r3dmol(  
         viewer_spec = m_viewer_spec(
           cartoonQuality = 10,
@@ -809,7 +864,11 @@ server <- function(input, output, session){
           style = m_style_cartoon(
             color = "#00cc96"
           )
-        ) %>%
+        )
+    )
+    
+    output$structure3d <- renderR3dmol({
+      pdb_window() %>%
         m_zoom_to()
     })
   })
@@ -837,29 +896,7 @@ server <- function(input, output, session){
       }
       
       output$structure3d <- renderR3dmol({
-        r3dmol(  
-          viewer_spec = m_viewer_spec(
-            cartoonQuality = 10,
-            lowerZoomLimit = 50,
-            upperZoomLimit = 350
-          )
-        ) %>%
-          m_add_model(
-            data = pdb_data(), 
-            format = "pdb"
-          ) %>%
-          m_set_style(
-            sel = m_sel(chain = chains()[1]),
-            style = m_style_cartoon(
-              color = "hotpink"
-            )
-          ) %>%
-          m_set_style(
-            sel = m_sel(chain = chains()[2]),
-            style = m_style_cartoon(
-              color = "#00cc96"
-            )
-          ) %>%
+        pdb_window() %>%
           m_set_style(
             sel = m_sel(chain = chains()[1], resi = range1),
             style = m_style_cartoon(
@@ -869,10 +906,9 @@ server <- function(input, output, session){
           m_set_style(
             sel = m_sel(chain = chains()[2], resi = range2),
             style = m_style_cartoon(
-              color = "blue"
+              color = "darkorange"
             )
-          ) %>%
-          m_zoom_to()
+          )
       })
     }
   })
@@ -883,30 +919,7 @@ server <- function(input, output, session){
     req(input$pdb)
     
     output$structure3d <- renderR3dmol({
-      r3dmol(  
-        viewer_spec = m_viewer_spec(
-          cartoonQuality = 10,
-          lowerZoomLimit = 50,
-          upperZoomLimit = 350
-        )
-      ) %>%
-        m_add_model(
-          data = pdb_data(), 
-          format = "pdb"
-        ) %>%
-        m_set_style(
-          sel = m_sel(chain = chains()[1]),
-          style = m_style_cartoon(
-            color = "hotpink"
-          )
-        ) %>%
-        m_set_style(
-          sel = m_sel(chain = chains()[2]),
-          style = m_style_cartoon(
-            color = "#00cc96"
-          )
-        ) %>%
-        m_zoom_to()
+      pdb_window()
     })
   })
   
@@ -937,29 +950,7 @@ server <- function(input, output, session){
     req(showing_pdb())
     
     output$structure3d <- renderR3dmol({
-      r3dmol(  
-        viewer_spec = m_viewer_spec(
-          cartoonQuality = 10,
-          lowerZoomLimit = 50,
-          upperZoomLimit = 350
-        )
-      ) %>%
-        m_add_model(
-          data = pdb_data(), 
-          format = "pdb"
-        ) %>%
-        m_set_style(
-          sel = m_sel(chain = chains()[1]),
-          style = m_style_cartoon(
-            color = "hotpink"
-          )
-        ) %>%
-        m_set_style(
-          sel = m_sel(chain = chains()[2]),
-          style = m_style_cartoon(
-            color = "#00cc96"
-          )
-        ) %>%
+      pdb_window() %>%
         m_zoom_to()
     })
   })
@@ -973,8 +964,14 @@ server <- function(input, output, session){
       filteredpdb_data <- results()
       if(!is.null(filteredpdb_data)) {
         filteredpdb_data <- filter_by_distance(results(), pdb_object(), input$pdbFilter, chains())
-        displayed_df(filteredpdb_data)
-        output$dataTable <- renderDT(datatable(filteredpdb_data, selection = 'single'))
+        if(nrow(filteredpdb_data) > 0){
+          clean_filtered_pdb_data <- clean_filtered_rows(filteredpdb_data)
+          displayed_df(clean_filtered_pdb_data)
+          output$dataTable <- renderDT(datatable(clean_filtered_pdb_data, selection = 'single'))
+        } else {
+          displayed_df(filteredpdb_data)
+          output$dataTable <- renderDT(datatable(filteredpdb_data))
+        }
       }
     }
   })
@@ -983,6 +980,111 @@ server <- function(input, output, session){
   observeEvent(input$cdRevert, {
     displayed_df(results())
     output$dataTable <- renderDT(datatable(results(), selection = 'single'))
+  })
+  
+  observeEvent(input$cdLabel, {
+    pres_res(TRUE)
+    
+    observeEvent(input$dataTable_rows_selected, {
+      req(showing_pdb())
+      req(pres_res())
+      selected_row <- input$dataTable_rows_selected
+      if(length(selected_row) > 0){
+        selected_data <- displayed_df() [selected_row, ]
+        
+        range1 = selected_data[["Range 1"]]
+        range2 = selected_data[["Range 2"]]
+        res1 = selected_data[["Residue 1"]]
+        res2 = selected_data[["Residue 2"]]
+        
+        if(length(unlist(strsplit(range1, ", "))) > 1){
+          range1 = multi_range_conversion(range1)
+        } else {
+          range1 = range_conversion(range1)
+        }
+        
+        if(length(unlist(strsplit(range2, ", "))) > 1){
+          range2 = multi_range_conversion(range2)
+        } else {
+          range2 = range_conversion(range2)
+        }
+        
+        output$structure3d <- renderR3dmol({
+          pdb_window() %>%
+            m_set_style(
+              sel = m_sel(chain = chains()[1], resi = range1),
+              style = m_style_cartoon(
+                color = "blue"
+              )
+            ) %>%
+            m_set_style(
+              sel = m_sel(chain = chains()[2], resi = range2),
+              style = m_style_cartoon(
+                color = "darkorange"
+              )
+            ) %>%
+            m_add_style(
+              sel = m_sel(chain = chains()[1], resi = res1),
+              style = c(
+                m_style_stick(),
+                m_style_sphere(scale = 0.3)
+              )
+            ) %>%
+            m_add_style(
+              sel = m_sel(chain = chains()[2], resi = res2),
+              style = c(
+                m_style_stick(),
+                m_style_sphere(scale = 0.3)
+              )
+            ) %>%
+            m_add_res_labels(sel = m_sel(chain = chains()[1], resi = res1)) %>%
+            m_add_res_labels(sel = m_sel(chain = chains()[2], resi = res2))
+        })
+      }
+    })
+    
+  })
+  
+  observeEvent(input$cdRemLabel, {
+    pres_res(FALSE)
+    
+    observeEvent(input$dataTable_rows_selected, {
+      selected_row <- input$dataTable_rows_selected
+      if(length(selected_row) > 0){
+        selected_data <- displayed_df() [selected_row, ]
+        
+        range1 = selected_data[["Range 1"]]
+        range2 = selected_data[["Range 2"]]
+        
+        if(length(unlist(strsplit(range1, ", "))) > 1){
+          range1 = multi_range_conversion(range1)
+        } else {
+          range1 = range_conversion(range1)
+        }
+        
+        if(length(unlist(strsplit(range2, ", "))) > 1){
+          range2 = multi_range_conversion(range2)
+        } else {
+          range2 = range_conversion(range2)
+        }
+        
+        output$structure3d <- renderR3dmol({
+          pdb_window() %>%
+            m_set_style(
+              sel = m_sel(chain = chains()[1], resi = range1),
+              style = m_style_cartoon(
+                color = "blue"
+              )
+            ) %>%
+            m_set_style(
+              sel = m_sel(chain = chains()[2], resi = range2),
+              style = m_style_cartoon(
+                color = "darkorange"
+              )
+            )
+        })
+      }
+    })
   })
 }
 
