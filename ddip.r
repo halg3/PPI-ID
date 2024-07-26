@@ -398,15 +398,21 @@ filter_by_distance <- function(df, pdb_object, distance, chains){
 # in contact based on contact filter applied.
 clean_filtered_rows = function(filtered_df){
   
-  cleaned_df = data.frame(matrix(ncol = 7, nrow = 0))
+  cleaned_df = data.frame(matrix(ncol = ncol(filtered_df), nrow = 0))
   colnames(cleaned_df) = colnames(filtered_df)
   
   for(i in 1:nrow(filtered_df)){
     
     rg1 = unlist(strsplit(filtered_df$`Range 1`[i], ', '))
     rg2 = unlist(strsplit(filtered_df$`Range 2`[i], ', '))
-    rs1 = as.numeric(unlist(strsplit(filtered_df$`Residue 1`[i], ', ')))
-    rs2 = as.numeric(unlist(strsplit(filtered_df$`Residue 2`[i], ', ')))
+    
+    if(is.character(filtered_df$`Residue 1`) && is.character(filtered_df$`Residue 2`)){
+      rs1 = as.numeric(unlist(strsplit(filtered_df$`Residue 1`[i], ', ')))
+      rs2 = as.numeric(unlist(strsplit(filtered_df$`Residue 2`[i], ', ')))
+    } else {
+      rs1 = filtered_df$`Residue 1`[i]
+      rs2 = filtered_df$`Residue 2`[i]
+    }
     
     new_row = filtered_df[i, ]
     
@@ -442,9 +448,151 @@ clean_filtered_rows = function(filtered_df){
   return(cleaned_df)
 }
 
+# Prepares InterPro protein information for contact discovery
+interpro_col_names_clean_ranges <- function(protein){
+  firstrow = colnames(protein)
+  protein = rbind(firstrow, protein)
+  colnames(protein) = c("Sequence", "Name", "Length", "Database", "ID", "Description", "Start", "End", "prob", "T/F", "Date", "Interpro_ID", "DomainName", "GO", "Desc1")
+  protein = protein[protein$Database == "Pfam", ]
+  
+  protein$range = paste(protein$Start, protein$End, sep = '-' )
+  protein$Start = NULL
+  protein$End = NULL
+  
+  return(protein)
+}
+
+# Prepares ELM protein information for contact discovery
+elm_col_names_clean_ranges <- function(protein){
+  elm_table_names = c("slim", "sequence", "range", "misc", "description", "location", "pattern", "phi", "structure", "probability")
+  elm_default_table_names = c("Elm Name", "Instances (Matched Sequence)", "Positions", "View in Jmol", "Elm Description", "Cell Compartment", "Pattern", "PHI-Blast Instance Mapping", "Structural Filter Info", "Probability")
+  
+  if(sum(colnames(protein) == elm_default_table_names) == 10){
+    colnames(protein) = elm_table_names
+  } else if(colnames(protein)[1] %in% interaction_id$elm_identifier){
+    firstrow = colnames(protein)
+    protein = rbind(firstrow, protein)
+    colnames(protein) <- elm_table_names
+  }
+  
+  protein_range = gsub(" \\[A\\]", ",", protein$range)
+  for(i in 1:length(protein_range)){
+    if(substr(protein_range[i], nchar(protein_range[i]), nchar(protein_range[i])) == ","){
+      protein_range[i] = substr(protein_range[i], 1, nchar(protein_range[i])-1)
+    }
+  }
+  protein$range = NULL
+  protein$range = protein_range
+  
+  return(protein)
+}
+
+# Converts ranges from protein information from (A-C) to A, B, C.
+range_dumper <- function(protein){
+  for(i in 1:nrow(protein)){
+    dumped_range = multi_range_conversion(protein$range[i])
+    dumped_range = paste0(dumped_range, collapse = ' ')
+    protein$range[i] = dumped_range
+  }
+  
+  return(protein)
+}
+
+# Creates a data frame of contacts within a specified distance (from PDB file)
+extract_contacts <- function(pdb_object, distance, chains){
+  inds = atom.select(pdb_object, 'calpha')
+  cont_map = cmap(pdb_object$xyz[inds$xyz], dcut = distance, scut = 10, rmgaps = TRUE)
+  
+  interacting_pairs = data.frame(which(cont_map == 1, arr.ind = TRUE))
+  
+  ca_A <- atom.select(pdb_object, string = "calpha", chain = chains[1])
+  ca_B <- atom.select(pdb_object, string = "calpha", chain = chains[2])
+  
+  seq_A = pdbseq(pdb_object, inds = ca_A)
+  seq_B = pdbseq(pdb_object, inds = ca_B)
+  interacting_A = interacting_pairs[interacting_pairs$row <= length(seq_A), ]
+  interacting_AB = interacting_A[interacting_A$col > length(seq_A), ]
+  interacting_AB$col = interacting_AB$col - length(seq_A)
+  
+  return(interacting_AB)
+}
+
+# Creates data frame of all contacts found within contact table and the protein pair information
+contact_unearther <- function(protein1, protein2, protein1_packed, protein2_packed, contacts){
+  region1 = c()
+  region2 = c()
+  range1 = c()
+  range2 = c()
+  residue1 = c()
+  residue2 = c()
+  
+  for(i in 1:nrow(contacts)){
+    for(j in 1:nrow(protein1)){
+      if(contacts$row[i] %in% as.numeric(unlist(strsplit(protein1$range[j], ' ')))){
+        for(k in 1:nrow(protein2)){
+          if(contacts$col[i] %in% as.numeric(unlist(strsplit(protein2$range[k], ' ')))){
+            region1 = c(region1, protein1$slim[j])
+            region2 = c(region2, protein2$DomainName[k])
+            range1 = c(range1, protein1_packed$range[j])
+            range2 = c(range2, protein2_packed$range[k])
+            residue1 = c(residue1, contacts$row[i])
+            residue2 = c(residue2, contacts$col[i])
+          }
+        }
+      }
+    }
+  }
+  
+  final_table = data.frame(region1, region2, range1, range2, residue1, residue2)
+  colnames(final_table) = c('Protein 1', 'Protein 2', 'Range 1', 'Range 2', 'Residue 1', 'Residue 2')
+  
+  return(final_table)
+}
+
+# Cleans up table of contacts found between proteins, ensuring that all residues within the same domain/SLiM are
+# stored in the same row.
+consolidate_contacts <- function(cleaned_pdb_contacts){
+  protein1_names = unique(cleaned_pdb_contacts$`Protein 1`)
+  protein2_names = unique(cleaned_pdb_contacts$`Protein 2`)
+  
+  if(length(protein1_names) > length(protein2_names)){
+    subsetting_vector = protein1_names
+    ref_prot = 'Protein 1'
+    other_prot = 'Protein 2'
+  } else {
+    subsetting_vector = protein2_names
+    ref_prot = 'Protein 2'
+    other_prot = 'Protein 1'
+  }
+  
+  consolidated_df = data.frame(matrix(ncol = ncol(cleaned_pdb_contacts), nrow = 0))
+  colnames(consolidated_df) = colnames(cleaned_pdb_contacts)
+  
+  for(name in subsetting_vector){
+    region_subset = unique(cleaned_pdb_contacts[cleaned_pdb_contacts[[ref_prot]] == name, ])
+    sub2setting_vector = unique(region_subset[[other_prot]])
+    
+    sub_df = data.frame(matrix(ncol = ncol(cleaned_pdb_contacts), nrow = 0))
+    colnames(sub_df) = colnames(cleaned_pdb_contacts)
+    
+    for(subname in sub2setting_vector){
+      region_sub2set = region_subset[region_subset[[other_prot]] == subname, ]
+      new_sub_row = region_sub2set[1, ]
+      
+      new_sub_row$`Residue 1` = paste0(unique(region_sub2set$`Residue 1`), collapse = ', ')
+      new_sub_row$`Residue 2` = paste0(unique(region_sub2set$`Residue 2`), collapse = ', ')
+      
+      sub_df = rbind(sub_df, new_sub_row)
+    }
+    
+    consolidated_df = rbind(consolidated_df, sub_df)
+  }
+  return(consolidated_df)
+}
+
 # User interface
 ui <- fluidPage(
-  titlePanel("Domain-Domain Interaction Prediction"),
+  titlePanel("Protein-Protein Interaction Identifier"),
   tabsetPanel(
     tabPanel("Predict",
              sidebarLayout(
@@ -473,6 +621,12 @@ ui <- fluidPage(
                    column(6, actionButton("cdFilter", "Filter", style = "width: 200px;")),
                    column(6, actionButton("cdRevert", "Revert", style = "width: 200px;"))
                  ),
+                 tags$hr(style = "border-top: 1px solid #444444;"),
+                 fluidRow(
+                   column(6, actionButton("unearth", "Show All Contacts", style = "width: 200px;")),
+                   column(6, actionButton("cdRevert", "Show Only Predicted", style = "width: 200px;"))
+                 ),
+                 tags$hr(style = "border-top: 1px solid #444444;"),
                  fluidRow(
                    column(6, actionButton("cdLabel", "Add Contact Labels", style = "width: 200px;")),
                    column(6, actionButton("cdRemLabel", "Remove Contact Labels", style = "width: 200px;"))
@@ -513,26 +667,36 @@ server <- function(input, output, session){
   error_message = reactiveVal(NULL)
   displayed_df = reactiveVal(NULL)
   
+  protein1 = reactiveVal(NULL)
+  protein2 = reactiveVal(NULL)
+  
+  observeEvent(input$file1, {
+    req(input$file1)
+    protein1(read_tsv(input$file1$datapath))
+  })
+  
+  observeEvent(input$file2, {
+    req(input$file2)
+    protein2(read_tsv(input$file2$datapath))
+  })
+  
   # Reactive value: data frame of domains/motifs that are predicted as potential interaction partners
   results <- reactive({
-    req(input$file1)
-    req(input$file2)
+    req(protein1())
+    req(protein2())
     
-    protein1 <- read_tsv(input$file1$datapath)
-    protein2 <- read_tsv(input$file2$datapath)
-    
-    prot_db_1 <- db_id(protein1)
-    prot_db_2 <- db_id(protein2)
+    prot_db_1 <- db_id(protein1())
+    prot_db_2 <- db_id(protein2())
     
     if(prot_db_1 + prot_db_2 == 2){
       error_message(NULL)
-      interpro_algo(protein1, protein2)
+      interpro_algo(protein1(), protein2())
     } else if(prot_db_1 + prot_db_2 == 0){
-      error_message(NULL)
-      elm_algo(protein1, protein2)
+      error_message("Please provide domain information for at least one protein")
+      return(NULL)
     } else if(prot_db_1 + prot_db_2 == 1){
       error_message(NULL)
-      mixed_algo(protein1, protein2, prot_db_1)
+      mixed_algo(protein1(), protein2(), prot_db_1)
     } else {
       error_message("Please ensure domain/SLiM information for both proteins are from either InterPro or the ELM Database")
       return(NULL)
@@ -560,6 +724,7 @@ server <- function(input, output, session){
   })
   
   output$dataTable <- renderDT({
+    req(is.null(error_message()))
     displayed_df(results())
     datatable(results(), selection = 'single')
   })
@@ -589,12 +754,13 @@ server <- function(input, output, session){
   # Generates either 1. an error message if a non-valid TSV is uploaded or 2. a message that says no interactions are predicted.
   output$message <- renderUI({
     msg <- error_message()
-    outcome <- results()
     if (!is.null(msg)) {
       div(style = "color: red;", msg)
-    }
-    if (is.null(outcome)){
-      div(style = "color: black", "No potential interactions identified.")
+    } else {
+      outcome <- results()
+      if (is.null(outcome)) {
+        div(style = "color: black;", "No potential interactions identified.")
+      }
     }
   })
   
@@ -706,6 +872,7 @@ server <- function(input, output, session){
   # Allows user to interact with 3D model using the table of potential interactions
   observeEvent(input$dataTable_rows_selected, {
     req(showing_pdb())
+    req(input$pdb)
     selected_row <- input$dataTable_rows_selected
     if(length(selected_row) > 0){
       selected_data <- displayed_df() [selected_row, ]
@@ -780,8 +947,7 @@ server <- function(input, output, session){
     req(showing_pdb())
     
     output$structure3d <- renderR3dmol({
-      pdb_window() %>%
-        m_zoom_to()
+      pdb_window()
     })
   })
   
@@ -808,6 +974,45 @@ server <- function(input, output, session){
           output$dataTable <- renderDT(datatable(filteredpdb_data))
         }
       }
+    }
+  })
+  
+  # Allows user to reveal all contacts detecting within PDB file, not just those predicted interactions that fall
+  # within the desired contact distance.
+  observeEvent(input$unearth, {
+    req(protein1())
+    req(protein2())
+    req(pdb_object())
+    
+    if(db_id(protein1()) == 1){
+      protein1_packed = interpro_col_names_clean_ranges(protein1())
+    } else {
+      protein1_packed = elm_col_names_clean_ranges(protein1())
+    }
+    
+    if(db_id(protein2()) == 1){
+      protein2_packed = interpro_col_names_clean_ranges(protein2())
+    } else {
+      protein2_packed = elm_col_names_clean_ranges(protein2())
+    }
+    
+    protein1 = range_dumper(protein1_packed)
+    protein2 = range_dumper(protein2_packed)
+    
+    contacts = extract_contacts(pdb_object(), input$pdbFilter, chains())
+    
+    all_pdb_contacts = contact_unearther(protein1, protein2, protein1_packed, protein2_packed, contacts)
+    cleaned_pdb_contacts = clean_filtered_rows(all_pdb_contacts)
+    
+    consolidated_contacts = consolidate_contacts(cleaned_pdb_contacts)
+    
+    if(nrow(consolidated_contacts > 0)){
+      displayed_df(consolidated_contacts)
+      output$dataTable <- renderDT(datatable(consolidated_contacts, selection = 'single'))
+    } else {
+      empty_df = data.frame(matrix(ncol = 6))
+      colnames(empty_df) = c('Protein 1', 'Protein 2', 'Range 1', 'Range 2', 'Residue 1', 'Residue 2')
+      output$dataTable <- renderDT(datatable(empty_df, selection = 'single'))
     }
   })
   
