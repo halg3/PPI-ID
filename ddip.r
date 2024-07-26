@@ -619,13 +619,9 @@ ui <- fluidPage(
                  numericInput("pdbFilter", "Contact Distance Filter:", min = 1, max = 100, value = NULL, step = 1),
                  fluidRow(
                    column(6, actionButton("cdFilter", "Filter", style = "width: 200px;")),
-                   column(6, actionButton("cdRevert", "Revert", style = "width: 200px;"))
+                   column(6, actionButton("unearth", "Show All Contacts", style = "width: 200px;"))
                  ),
-                 tags$hr(style = "border-top: 1px solid #444444;"),
-                 fluidRow(
-                   column(6, actionButton("unearth", "Show All Contacts", style = "width: 200px;")),
-                   column(6, actionButton("cdRevert", "Show Only Predicted", style = "width: 200px;"))
-                 ),
+                 actionButton("cdRevert", "Revert", style = "width: 200px;"),
                  tags$hr(style = "border-top: 1px solid #444444;"),
                  fluidRow(
                    column(6, actionButton("cdLabel", "Add Contact Labels", style = "width: 200px;")),
