@@ -984,6 +984,8 @@ server <- function(input, output, session){
     req(protein2())
     req(pdb_object())
     
+    filtered(TRUE)
+    
     if(db_id(protein1()) == 1){
       protein1_packed = interpro_col_names_clean_ranges(protein1())
     } else {
