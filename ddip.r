@@ -526,17 +526,56 @@ contact_unearther <- function(protein1, protein2, protein1_packed, protein2_pack
   residue1 = c()
   residue2 = c()
   
-  for(i in 1:nrow(contacts)){
-    for(j in 1:nrow(protein1)){
-      if(contacts$row[i] %in% as.numeric(unlist(strsplit(protein1$range[j], ' ')))){
-        for(k in 1:nrow(protein2)){
-          if(contacts$col[i] %in% as.numeric(unlist(strsplit(protein2$range[k], ' ')))){
-            region1 = c(region1, protein1$slim[j])
-            region2 = c(region2, protein2$DomainName[k])
-            range1 = c(range1, protein1_packed$range[j])
-            range2 = c(range2, protein2_packed$range[k])
-            residue1 = c(residue1, contacts$row[i])
-            residue2 = c(residue2, contacts$col[i])
+  interpro_names = c("Sequence", "Name", "Length", "Database", "ID", "Description", "prob", "T/F", "Date", "Interpro_ID", "DomainName", "GO", "Desc1", "range")
+  elm_names = c("slim", "sequence", "misc", "description", "location", "pattern", "phi", "structure", "probability", "range")
+  
+  if(identical(colnames(protein1), elm_names) && identical(colnames(protein2), interpro_names)){
+    for(i in 1:nrow(contacts)){
+      for(j in 1:nrow(protein1)){
+        if(contacts$row[i] %in% as.numeric(unlist(strsplit(protein1$range[j], ' ')))){
+          for(k in 1:nrow(protein2)){
+            if(contacts$col[i] %in% as.numeric(unlist(strsplit(protein2$range[k], ' ')))){
+              region1 = c(region1, protein1$slim[j])
+              region2 = c(region2, protein2$DomainName[k])
+              range1 = c(range1, protein1_packed$range[j])
+              range2 = c(range2, protein2_packed$range[k])
+              residue1 = c(residue1, contacts$row[i])
+              residue2 = c(residue2, contacts$col[i])
+            }
+          }
+        }
+      }
+    }
+  } else if(identical(colnames(protein1), interpro_names) && identical(colnames(protein2), elm_names)){
+    for(i in 1:nrow(contacts)){
+      for(j in 1:nrow(protein1)){
+        if(contacts$row[i] %in% as.numeric(unlist(strsplit(protein1$range[j], ' ')))){
+          for(k in 1:nrow(protein2)){
+            if(contacts$col[i] %in% as.numeric(unlist(strsplit(protein2$range[k], ' ')))){
+              region1 = c(region1, protein1$DomainName[j])
+              region2 = c(region2, protein2$slim[k])
+              range1 = c(range1, protein1_packed$range[j])
+              range2 = c(range2, protein2_packed$range[k])
+              residue1 = c(residue1, contacts$row[i])
+              residue2 = c(residue2, contacts$col[i])
+            }
+          }
+        }
+      }
+    }
+  } else if(identical(colnames(protein1), interpro_names) && identical(colnames(protein2), interpro_names)){
+    for(i in 1:nrow(contacts)){
+      for(j in 1:nrow(protein1)){
+        if(contacts$row[i] %in% as.numeric(unlist(strsplit(protein1$range[j], ' ')))){
+          for(k in 1:nrow(protein2)){
+            if(contacts$col[i] %in% as.numeric(unlist(strsplit(protein2$range[k], ' ')))){
+              region1 = c(region1, protein1$DomainName[j])
+              region2 = c(region2, protein2$DomainName[k])
+              range1 = c(range1, protein1_packed$range[j])
+              range2 = c(range2, protein2_packed$range[k])
+              residue1 = c(residue1, contacts$row[i])
+              residue2 = c(residue2, contacts$col[i])
+            }
           }
         }
       }
@@ -618,7 +657,7 @@ ui <- fluidPage(
                  tags$hr(style = "border-top: 1px solid #444444;"),
                  numericInput("pdbFilter", "Contact Distance Filter:", min = 1, max = 100, value = NULL, step = 1),
                  fluidRow(
-                   column(6, actionButton("cdFilter", "Filter", style = "width: 200px;")),
+                   column(6, actionButton("cdFilter", "Filter Predicted Contacts", style = "width: 200px;")),
                    column(6, actionButton("unearth", "Show All Contacts", style = "width: 200px;"))
                  ),
                  actionButton("cdRevert", "Revert", style = "width: 200px;"),
