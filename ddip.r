@@ -1,4 +1,5 @@
 library(shiny)
+library(shinyjs)
 library(shinycssloaders)
 library(DT)
 library(readr)
@@ -11,10 +12,11 @@ library(reshape2)
 
 # File upload:
 # Paste path name to compiled_interactions.csv here
-compiled_interactions = read.csv("/Users/hvygoodwin/Downloads/DifB_Project/app/compiled_interactions.csv")
+compiled_interactions = read.csv("/Users/hvygoodwin/Downloads/DifB_Project/ppid/compiled_interactions.csv")
+
 
 # Paste path name to interaction_id.tsv here
-interaction_id = read_tsv("/Users/hvygoodwin/Downloads/DifB_Project/app/interaction_id.tsv")
+interaction_id = read_tsv("/Users/hvygoodwin/Downloads/DifB_Project/ppid/interaction_id.tsv")
 
 # A number of custom functions made to execute the function of this script:
 # Function that identifies which tool (InterPro or ELM) was used to generate protein domain/slim information.
@@ -332,9 +334,66 @@ bin_dataframe <- function(results){
   return(total_dataframe)
 }
 
+# Helper function for adding amino acid flanks to Pfam protein domains as determined by InterPro. If there is 
+# PDB information provided, this function will apply a ceiling 
+add_flank_helper <- function(df, range, flank_length, protein_length = NULL){
+  for(i in 1:nrow(df)){
+    min = min(as.numeric(unlist(strsplit(df[[range]][i], split = '-'))))
+    max = max(as.numeric(unlist(strsplit(df[[range]][i], split = '-'))))
+    
+    if(min - flank_length < 1){
+      min = 1
+    } else {
+      min = min - flank_length
+    }
+    
+    if(!is.null(protein_length)){
+      if(max + flank_length > protein_length){
+        max = protein_length
+      } else {
+        max = max + flank_length
+      }
+    } else {
+      max = max + flank_length
+    }
+    
+    new_range = paste(min, max, sep = '-')
+    
+    df[[range]][i] = new_range
+  }
+  
+  return(df)
+}
+
+# Adds user-defined amino acid flanks to Pfam protein domains, as identified by InterPro. 
+add_flank <- function(df, protein, flank_length, pdb_object = NULL, chains = NULL){
+  if(protein == 1){
+    range = 'Range 1'
+  } else {
+    range = 'Range 2'
+  }
+  
+  if(!is.null(pdb_object)){
+    inds = atom.select(pdb_object, 'calpha')
+    if(protein == 1){
+      ca_1 <- atom.select(pdb_object, string = "calpha", chain = chains[1])
+      protein_length = length(pdbseq(pdb_object, inds = ca_1))
+    } else {
+      ca_2 <- atom.select(pdb_object, string = "calpha", chain = chains[2])
+      protein_length = length(pdbseq(pdb_object, inds = ca_2))
+    }
+    
+    flanked_df = add_flank_helper(df, range, flank_length, protein_length)
+  } else {
+    flanked_df = add_flank_helper(df, range, flank_length)
+  }
+  
+  return(flanked_df)
+}
+
 # Filters data frame by PDB contact distances, if a PDB file is provided. Updated version of the function provides
 # information on specific residues that are coming in contact. Functions from the Bio3D (Grant, et al.) library 
-# was used in this function.
+# were used in this function.
 filter_by_distance <- function(df, pdb_object, distance, chains){
   inds = atom.select(pdb_object, 'calpha')
   cont_map = cmap(pdb_object$xyz[inds$xyz], dcut = distance, scut = 10, rmgaps = TRUE)
@@ -583,9 +642,14 @@ contact_unearther <- function(protein1, protein2, protein1_packed, protein2_pack
   }
   
   final_table = data.frame(region1, region2, range1, range2, residue1, residue2)
-  colnames(final_table) = c('Protein 1', 'Protein 2', 'Range 1', 'Range 2', 'Residue 1', 'Residue 2')
-  
-  return(final_table)
+  if(nrow(final_table) == 0){
+    empty_df = data.frame(matrix(ncol = 6))
+    colnames(empty_df) = c('Protein 1', 'Protein 2', 'Range 1', 'Range 2', 'Residue 1', 'Residue 2')
+    return(empty_df)
+  } else {
+    colnames(final_table) = c('Protein 1', 'Protein 2', 'Range 1', 'Range 2', 'Residue 1', 'Residue 2')
+    return(final_table)
+  }
 }
 
 # Cleans up table of contacts found between proteins, ensuring that all residues within the same domain/SLiM are
@@ -631,6 +695,7 @@ consolidate_contacts <- function(cleaned_pdb_contacts){
 
 # User interface
 ui <- fluidPage(
+  useShinyjs(),
   titlePanel("Protein-Protein Interaction Identifier"),
   tabsetPanel(
     tabPanel("Predict",
@@ -638,12 +703,12 @@ ui <- fluidPage(
                sidebarPanel(
                  fileInput("file1", "Choose TSV File for Protein 1:", accept = ".tsv"),
                  fileInput("file2", "Choose TSV File for Protein 2:", accept = ".tsv"),
-                 fluidRow(
-                   column(6, actionButton("show", "Show Predictions Heat Map", style = "width: 200px;")),
-                   column(6, actionButton("hide", "Hide Predictions Heat Map", style = "width: 200px;"))
-                 ),
-                 p(" "),
                  downloadButton("downloadData", "Download Results"),
+                 tags$hr(style = "border-top: 1px solid #444444;"),
+                 fluidRow(
+                   column(6, numericInput("flank1", "AA Flank 1", value = 0, min = 0, max = 100, step = 10)),
+                   column(6, numericInput("flank2", "AA Flank 2", value = 0, min = 0, max = 100, step = 10))
+                 ),
                  tags$hr(style = "border-top: 1px solid #444444;"),
                  numericInput("numericFilter", "Only Show Probabilities Less Than...", min = 0, max = 1, value = NULL, step = 1e-10),
                  tags$hr(style = "border-top: 1px solid #444444;"),
@@ -652,7 +717,6 @@ ui <- fluidPage(
                    column(6, actionButton("showpdb", "Show PDB", style = "width: 200px;")),
                    column(6, actionButton("hidepdb", "Hide PDB", style = "width: 200px;"))
                  ),
-                 p(" "),
                  actionButton("refreshPdb", "Revert Model to Original"),
                  tags$hr(style = "border-top: 1px solid #444444;"),
                  numericInput("pdbFilter", "Contact Distance Filter:", min = 1, max = 100, value = NULL, step = 1),
@@ -668,9 +732,6 @@ ui <- fluidPage(
                  ),
                  actionButton("cartoonPlease", "Cartoon-View Only", style = "width: 200px;"),
                  tags$hr(style = "border-top: 1px solid #444444;"),
-                 tags$h5("Heat Map Axes:"),
-                 tags$h6("Vertical Axis - Protein 1", style = "font-weight: 350;"),
-                 tags$h6("Horizontal Axis - Protein 2", style = "font-weight: 350;"),
                  tags$h5("3D Molecular Model Color Key:"),
                  tags$h6(tags$span(style = "color: hotpink;", "Protein 1"),
                          tags$span(style = "color: #00cc96;", "Protein 2"))
@@ -688,8 +749,31 @@ ui <- fluidPage(
     ),
     tabPanel("About",
              h3("About"),
-             h4("This work?"),
+             p("This is a structural bioinformatics tool that aids domain-domain, domain-motif, or motif-motif
+             interaction prediction between proteins. This tool was designed to help researchers refine inputted
+             amino acid sequences when predicting protein-protein interactions using AlphaFold Multimer, as well
+             as to help researchers determine which domains/motifs are mediating interactions if you would prefer
+             to provide a PDB file in addition to protein domain/motif information. To use, 
+             provide protein domain or small linear motif (SLiM) information generated by either InterPro or the
+             ELM database. Interaction predictions, as sorted in increasing order of combined probability of each
+             domain/SLiM sequence occurring by chance, can be downloaded as a tsv by the user."),
+             p("After running predictions on AlphaFold, the user is able to upload the resulting PDB file and 
+             interact with the data frame of predicted interactions. Please note that in order for data frame and 
+             the 3D molecular model to properly interact, the sequences submitted to InterPro/ELM must be the exact 
+             same as the sequences that were folded. Also note that the order of protein sequences folded in AlphaFold 
+             must match that of Protein 1 and Protein 2 tsv's uploaded to the tool."),
+             p("This tool takes advantage of a compiled dataset of domain-domain interactions from the 3did 
+               (2022 release) and DOMINE databases. As a result, domains are identified by their Pfam ID, and 
+               domain-SLiM interactions are provided by the Eukaryotic Linear Motif (ELM) Database. Potential 
+               interactions are determined according to the appropriate algorithm implemented in the R script."),
+             HTML('<p>Additional resources for AlphaFold output analysis (PAE plot generation, ipTM/pTM score fetching, etc.)
+             can be accessed at PPID\'s
+        <a href="https://github.com/halg3/PPID" target="_blank">GitHub Page</a>.</p>'),
              h3("Help"),
+             HTML('<p>If you encounter any issues, please submit a pull request on PPID\'s
+        <a href="https://github.com/halg3/PPID/pulls" target="_blank">GitHub Page</a>.</p>'),
+             p("If you are running this app from RStudios, you may have to first open the tool in a browser before you 
+               are properly directed to the GitHub page."),
              h3("References"),
              p("Test"),
              p("Test")
@@ -704,6 +788,8 @@ server <- function(input, output, session){
   
   protein1 = reactiveVal(NULL)
   protein2 = reactiveVal(NULL)
+  
+  pdb_data = reactiveVal(NULL)
   
   observeEvent(input$file1, {
     req(input$file1)
@@ -738,30 +824,145 @@ server <- function(input, output, session){
     }
   })
   
-  # Reactive value: data frame of all of the 100 amino acid long windows of potential interacting patterns used to generate heat map.
-  final_df <- reactive({
-    res_df <- results()
-    req(res_df)
-    bin_dataframe(res_df)
-  })
-  
-  # Reactive value: final_df as a table that is used to generate heat map
-  final_table <- reactive({
-    df <- final_df()
-    req(df)
-    # Create contingency table using dcast
-    dt <- dcast(df, `Protein 1` ~ `Protein 2`, length)
-    # Set row names from the first column (Protein 1)
-    row.names(dt) <- dt[, 1]
-    # Remove the first column (Protein 1) if not needed in the heatmap
-    dt <- dt[, -1]
-    return(dt)
-  })
-  
+  # Displayes results() df
   output$dataTable <- renderDT({
     req(is.null(error_message()))
     displayed_df(results())
     datatable(results(), selection = 'single')
+  })
+  
+  flanked_df = reactiveVal(NULL)
+  
+  # Allows users to add aa flanks to protein 1
+  observeEvent(input$flank1, {
+    og_df = results()
+    protein = 1
+    
+    if(!is.null(pdb_data())){
+      req(showing_pdb())
+      
+      output$structure3d <- renderR3dmol({
+        pdb_window()
+      })
+    }
+    
+    if((input$flank1 != 0 && !is.na(input$flank1) && input$flank1 != "") && (input$flank2 == 0 || is.na(input$flank2) || input$flank2 == "")) {
+      if(!is.null(pdb_object())){
+        flanked_df(add_flank(og_df, protein, input$flank1, pdb_object(), chains()))
+        displayed_df(flanked_df())
+        output$dataTable <- renderDT({
+          datatable(flanked_df(), selection = 'single')
+        })
+      } else {
+        flanked_df(add_flank(og_df, protein, input$flank1))
+        displayed_df(flanked_df())
+        output$dataTable <- renderDT({
+          datatable(flanked_df(), selection = 'single')
+        })
+      }
+    } else if ((input$flank1 == 0 || is.na(input$flank1) || input$flank1 == "") && (input$flank2 != 0 && !is.na(input$flank2) && input$flank2 != "")) {
+      protein = 2
+      if(!is.null(pdb_object())){
+        flanked_df(add_flank(og_df, protein, input$flank2, pdb_object(), chains()))
+        displayed_df(flanked_df())
+        output$dataTable <- renderDT({
+          datatable(flanked_df(), selection = 'single')
+        })
+      } else {
+        flanked_df(add_flank(og_df, protein, input$flank2))
+        displayed_df(flanked_df())
+        output$dataTable <- renderDT({
+          datatable(flanked_df(), selection = 'single')
+        })
+      }
+    } else if((input$flank1 != 0 && !is.na(input$flank1) && input$flank1 != "") && (input$flank2 != 0 && !is.na(input$flank2) && input$flank2 != "")){
+      if(!is.null(pdb_object())){
+        flanked_df(add_flank(add_flank(og_df, 1, input$flank1, pdb_object(), chains()), 2, input$flank2, pdb_object(), chains()))
+        displayed_df(flanked_df())
+        output$dataTable <- renderDT({
+          datatable(flanked_df(), selection = 'single')
+        })
+      } else {
+        flanked_df(add_flank(add_flank(og_df, 1, input$flank1), 2, input$flank2))
+        displayed_df(flanked_df())
+        output$dataTable <- renderDT({
+          datatable(flanked_df(), selection = 'single')
+        })
+      }
+    } else {
+      displayed_df(og_df)
+      flanked_df(NULL)
+      
+      output$dataTable <- renderDT({
+        datatable(og_df, selection = 'single')
+      })
+    }
+  })
+  
+  # Allows users to add aa flanks to protein 2
+  observeEvent(input$flank2, {
+    og_df = results()
+    protein = 2
+    
+    if(!is.null(pdb_data())){
+      req(showing_pdb())
+      
+      output$structure3d <- renderR3dmol({
+        pdb_window()
+      })
+    }
+    
+    if((input$flank2 != 0 && !is.na(input$flank2) && input$flank2 != "") && (input$flank1 == 0 || is.na(input$flank1) || input$flank1 == "")) {
+      if(!is.null(pdb_object())){
+        flanked_df(add_flank(og_df, protein, input$flank2, pdb_object(), chains()))
+        displayed_df(flanked_df())
+        output$dataTable <- renderDT({
+          datatable(flanked_df(), selection = 'single')
+        })
+      } else {
+        flanked_df(add_flank(og_df, protein, input$flank2))
+        displayed_df(flanked_df())
+        output$dataTable <- renderDT({
+          datatable(flanked_df(), selection = 'single')
+        })
+      }
+    } else if ((input$flank2 == 0 || is.na(input$flank2) || input$flank2 == "") && (input$flank1 != 0 && !is.na(input$flank1) && input$flank1 != "")){
+      protein = 1
+      if(!is.null(pdb_object())){
+        flanked_df(add_flank(og_df, protein, input$flank1, pdb_object(), chains()))
+        displayed_df(flanked_df())
+        output$dataTable <- renderDT({
+          datatable(flanked_df(), selection = 'single')
+        })
+      } else {
+        flanked_df(add_flank(og_df, protein, input$flank1))
+        displayed_df(flanked_df())
+        output$dataTable <- renderDT({
+          datatable(flanked_df(), selection = 'single')
+        })
+      }
+    } else if((input$flank1 != 0 && !is.na(input$flank1) && input$flank1 != "") && (input$flank2 != 0 && !is.na(input$flank2) && input$flank2 != "")){
+      if(!is.null(pdb_object())){
+        flanked_df(add_flank(add_flank(og_df, 1, input$flank1, pdb_object(), chains()), 2, input$flank2, pdb_object(), chains()))
+        displayed_df(flanked_df())
+        output$dataTable <- renderDT({
+          datatable(flanked_df(), selection = 'single')
+        })
+      } else {
+        flanked_df(add_flank(add_flank(og_df, 1, input$flank1), 2, input$flank2))
+        displayed_df(flanked_df())
+        output$dataTable <- renderDT({
+          datatable(flanked_df(), selection = 'single')
+        })
+      }
+    } else {
+      displayed_df(og_df)
+      flanked_df(NULL)
+      
+      output$dataTable <- renderDT({
+        datatable(og_df, selection = 'single')
+      })
+    }
   })
   
   # Allows the user to input a probability filter.
@@ -802,57 +1003,15 @@ server <- function(input, output, session){
   # Allows user to download resulting data frame.
   output$downloadData <- downloadHandler(
     filename = function() {
-      paste("ddip-prediction", Sys.Date(), ".tsv", sep = "")
+      paste("ppid-prediction", Sys.Date(), ".tsv", sep = "")
     },
     content = function(file) {
-      write_tsv(results(), file)
+      write_tsv(displayed_df(), file)
     }
   )
   
-  # Reactive value: boolean value that is used to allow user to hide/show heat map.
-  plotVisible <- reactiveVal(FALSE)
-  
-  observeEvent(input$show, {
-    plotVisible(TRUE)
-  })
-  
-  observeEvent(input$hide, {
-    plotVisible(FALSE)
-  })
-  
-  output$plotVisible <- reactive({
-    plotVisible()
-  })
-  
-  outputOptions(output, "plotVisible", suspendWhenHidden = FALSE)
-  
-  # Display heat map
-  output$heatmap <- renderPlot({
-    req(plotVisible())
-    req(final_table())
-    
-    ft <- final_table()
-    pheatmap(ft,
-             clustering_method = "none",  # Turn off clustering
-             main = "",
-             fontsize = 10,  # Adjust font size
-             cellwidth = 30,  # Adjust cell width
-             cellheight = 30,  # Adjust cell height
-             cluster_cols = FALSE,  # Turn off clustering for columns
-             cluster_rows = FALSE,  # Turn off clustering for rows
-             scale = "none",  # Do not scale the data
-             border_color = NA,  # Remove border color
-             show_rownames = TRUE,  # Show row names
-             show_colnames = TRUE,  # Show column names
-             annotation_names_row = TRUE,  # Show row annotation names
-             annotation_names_col = TRUE,  # Show column annotation names
-             annotation_legend = TRUE  # Show annotation legend
-    )
-  })
-  
   # Reactive values: needed for 3D visualization of PDB files, identification of chains within PDB files, and for 
   # allowing the user to hide/show PDB structure after one has been uploaded.
-  pdb_data = reactiveVal(NULL)
   pdb_object = reactiveVal(NULL)
   pdb_window = reactiveVal(NULL)
   chains = reactiveVal(NULL)
@@ -887,13 +1046,13 @@ server <- function(input, output, session){
         m_set_style(
           sel = m_sel(chain = chains()[1]),
           style = m_style_cartoon(
-            color = "hotpink"
+            color = "magenta"
           )
         ) %>%
         m_set_style(
           sel = m_sel(chain = chains()[2]),
           style = m_style_cartoon(
-            color = "#00cc96"
+            color = "blue"
           )
         )
     )
@@ -932,13 +1091,13 @@ server <- function(input, output, session){
           m_set_style(
             sel = m_sel(chain = chains()[1], resi = range1),
             style = m_style_cartoon(
-              color = "blue"
+              color = "#00cc96"
             )
           ) %>%
           m_set_style(
             sel = m_sel(chain = chains()[2], resi = range2),
             style = m_style_cartoon(
-              color = "darkorange"
+              color = "goldenrod"
             )
           )
       })
@@ -996,17 +1155,35 @@ server <- function(input, output, session){
     
     filtered(TRUE)
     
-    if (!is.null(input$pdbFilter) && !is.na(input$pdbFilter) && input$pdbFilter != ""){
-      filteredpdb_data <- results()
-      if(!is.null(filteredpdb_data)) {
-        filteredpdb_data <- filter_by_distance(results(), pdb_object(), input$pdbFilter, chains())
-        if(nrow(filteredpdb_data) > 0){
-          clean_filtered_pdb_data <- clean_filtered_rows(filteredpdb_data)
-          displayed_df(clean_filtered_pdb_data)
-          output$dataTable <- renderDT(datatable(clean_filtered_pdb_data, selection = 'single'))
-        } else {
-          displayed_df(filteredpdb_data)
-          output$dataTable <- renderDT(datatable(filteredpdb_data))
+    if(is.null(flanked_df())){
+      if (!is.null(input$pdbFilter) && !is.na(input$pdbFilter) && input$pdbFilter != ""){
+        filteredpdb_data <- results()
+        if(!is.null(filteredpdb_data)) {
+          filteredpdb_data <- filter_by_distance(results(), pdb_object(), input$pdbFilter, chains())
+          if(nrow(filteredpdb_data) > 0){
+            clean_filtered_pdb_data <- clean_filtered_rows(filteredpdb_data)
+            displayed_df(clean_filtered_pdb_data)
+            output$dataTable <- renderDT(datatable(clean_filtered_pdb_data, selection = 'single'))
+          } else {
+            displayed_df(filteredpdb_data)
+            output$dataTable <- renderDT(datatable(filteredpdb_data))
+          }
+        }
+      }
+    } else {
+      req(flanked_df())
+      if (!is.null(input$pdbFilter) && !is.na(input$pdbFilter) && input$pdbFilter != ""){
+        filteredpdb_data <- flanked_df()
+        if(!is.null(filteredpdb_data)) {
+          filteredpdb_data <- filter_by_distance(flanked_df(), pdb_object(), input$pdbFilter, chains())
+          if(nrow(filteredpdb_data) > 0){
+            clean_filtered_pdb_data <- clean_filtered_rows(filteredpdb_data)
+            displayed_df(clean_filtered_pdb_data)
+            output$dataTable <- renderDT(datatable(clean_filtered_pdb_data, selection = 'single'))
+          } else {
+            displayed_df(filteredpdb_data)
+            output$dataTable <- renderDT(datatable(filteredpdb_data))
+          }
         }
       }
     }
@@ -1018,6 +1195,7 @@ server <- function(input, output, session){
     req(protein1())
     req(protein2())
     req(pdb_object())
+    req(input$pdbFilter)
     
     filtered(TRUE)
     
@@ -1039,26 +1217,65 @@ server <- function(input, output, session){
     contacts = extract_contacts(pdb_object(), input$pdbFilter, chains())
     
     all_pdb_contacts = contact_unearther(protein1, protein2, protein1_packed, protein2_packed, contacts)
-    cleaned_pdb_contacts = clean_filtered_rows(all_pdb_contacts)
     
-    consolidated_contacts = consolidate_contacts(cleaned_pdb_contacts)
-    
-    if(nrow(consolidated_contacts > 0)){
-      displayed_df(consolidated_contacts)
-      output$dataTable <- renderDT(datatable(consolidated_contacts, selection = 'single'))
-    } else {
-      empty_df = data.frame(matrix(ncol = 6))
+    if(is.na(all_pdb_contacts[1,1]) && is.null(flanked_df())){ # If there are no detected contacts within the non-flanked predicted ranges, an empty data frame will be displayed
+      empty_df = data.frame(matrix(ncol = 6, nrow = 0))
       colnames(empty_df) = c('Protein 1', 'Protein 2', 'Range 1', 'Range 2', 'Residue 1', 'Residue 2')
       output$dataTable <- renderDT(datatable(empty_df, selection = 'single'))
+    } else if(is.na(all_pdb_contacts[1,1]) && !is.null(flanked_df())){ # If there are no detected contacts within flanked predicted ranges, only discovered contacts within the flanked range will be displayed
+      req(flanked_df())
+      if (!is.null(input$pdbFilter) && !is.na(input$pdbFilter) && input$pdbFilter != ""){
+        filteredpdb_data <- flanked_df()
+        if(!is.null(filteredpdb_data)) {
+          filteredpdb_data <- filter_by_distance(flanked_df(), pdb_object(), input$pdbFilter, chains())
+          if(nrow(filteredpdb_data) > 0){
+            clean_filtered_pdb_data <- clean_filtered_rows(filteredpdb_data)
+            displayed_df(clean_filtered_pdb_data)
+            output$dataTable <- renderDT(datatable(clean_filtered_pdb_data, selection = 'single'))
+          } else {
+            displayed_df(filteredpdb_data)
+            output$dataTable <- renderDT(datatable(filteredpdb_data))
+          }
+        }
+      }
+    } else { # If there are detected contacts within the user-defined range, they will be displayed
+      cleaned_pdb_contacts = clean_filtered_rows(all_pdb_contacts)
+      
+      consolidated_contacts = consolidate_contacts(cleaned_pdb_contacts)
+      
+      if(nrow(consolidated_contacts > 0)){
+        displayed_df(consolidated_contacts)
+        output$dataTable <- renderDT(datatable(consolidated_contacts, selection = 'single'))
+      } else {
+        empty_df = data.frame(matrix(ncol = 6, nrow = 0))
+        colnames(empty_df) = c('Protein 1', 'Protein 2', 'Range 1', 'Range 2', 'Residue 1', 'Residue 2')
+        output$dataTable <- renderDT(datatable(empty_df, selection = 'single'))
+      }
     }
   })
   
   # Allows user to revert the filtered data frame back to the original
   observeEvent(input$cdRevert, {
-    filtered(FALSE)
+    req(filtered())
+    pres_res(FALSE)
     
-    displayed_df(results())
-    output$dataTable <- renderDT(datatable(results(), selection = 'single'))
+    if(is.null(flanked_df())){
+      displayed_df(results())
+      output$dataTable <- renderDT(datatable(results(), selection = 'single'))
+    } else {
+      displayed_df(flanked_df())
+      output$dataTable <- renderDT(datatable(flanked_df(), selection = 'single'))
+    }
+    
+    if(!is.null(pdb_data())){
+      req(showing_pdb())
+      
+      output$structure3d <- renderR3dmol({
+        pdb_window()
+      })
+    }
+    
+    filtered(FALSE)
   })
   
   # Allows the user to add labels to residues coming in 'contact,' as determined by the contact distance they 
@@ -1066,7 +1283,7 @@ server <- function(input, output, session){
   # to pinpoint the location of residues of interest.
   observeEvent(input$cdLabel, {
     pres_res(TRUE)
-    req(filtered)
+    req(filtered())
     
     observeEvent(input$dataTable_rows_selected, {
       req(showing_pdb())
@@ -1097,13 +1314,13 @@ server <- function(input, output, session){
             m_set_style(
               sel = m_sel(chain = chains()[1], resi = range1),
               style = m_style_cartoon(
-                color = "blue"
+                color = "#00cc96"
               )
             ) %>%
             m_set_style(
               sel = m_sel(chain = chains()[2], resi = range2),
               style = m_style_cartoon(
-                color = "darkorange"
+                color = "goldenrod"
               )
             ) %>%
             m_add_style(
@@ -1130,7 +1347,7 @@ server <- function(input, output, session){
   # Allows the user to get rid of residue labels, but keeps highlighted residues in ball and stick form.
   observeEvent(input$cdRemLabel, {
     pres_res(FALSE)
-    req(filtered)
+    req(filtered())
     
     observeEvent(input$dataTable_rows_selected, {
       selected_row <- input$dataTable_rows_selected
@@ -1159,13 +1376,13 @@ server <- function(input, output, session){
             m_set_style(
               sel = m_sel(chain = chains()[1], resi = range1),
               style = m_style_cartoon(
-                color = "blue"
+                color = "#00cc96"
               )
             ) %>%
             m_set_style(
               sel = m_sel(chain = chains()[2], resi = range2),
               style = m_style_cartoon(
-                color = "darkorange"
+                color = "goldenrod"
               )
             ) %>%
             m_add_style(
@@ -1189,7 +1406,7 @@ server <- function(input, output, session){
   
   # Allows the user to set PDB view to only cartoon, no ball and stick
   observeEvent(input$cartoonPlease, {
-    req(filtered)
+    req(filtered())
     
     observeEvent(input$dataTable_rows_selected, {
       selected_row <- input$dataTable_rows_selected
@@ -1216,13 +1433,13 @@ server <- function(input, output, session){
             m_set_style(
               sel = m_sel(chain = chains()[1], resi = range1),
               style = m_style_cartoon(
-                color = "blue"
+                color = "#00cc96"
               )
             ) %>%
             m_set_style(
               sel = m_sel(chain = chains()[2], resi = range2),
               style = m_style_cartoon(
-                color = "darkorange"
+                color = "goldenrod"
               )
             )
         })
