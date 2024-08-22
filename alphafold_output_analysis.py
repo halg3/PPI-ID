@@ -1,4 +1,8 @@
-# Can only be pointed at a single directory
+# This script can take a directory as a part of a command-line argument to extract PAE, ipTM and pTM information.
+# For example:
+# > python3 alphafold_output_analysis.py /path/to/directory/containing/alphafold/output
+# Some of this code was adopted from Lemal. (2022). "Explained: how to plot the prediction quality metrics with AlphaFold2," BioStrand, 
+# https://blog.biostrand.ai/explained-how-to-plot-the-prediction-quality-metrics-with-alphafold2.
 
 import os
 import pickle
