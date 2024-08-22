@@ -4,7 +4,7 @@ This is a structural bioinformatics tool that aids domain-domain, domain-motif, 
 
 After running predictions on AlphaFold, the user is able to upload the resulting PDB file and interact with the data frame of predicted interactions. Please note that in order for data frame and the 3D molecular model to properly interact, the sequences submitted to InterPro/ELM must be the exact same as the sequences that were folded. Also note that the order of protein sequences folded in AlphaFold must match that of Protein 1 and Protein 2 tsv's uploaded to the tool. 
 
-This tool takes advantage of a compiled dataset of domain-domain interactions from the 3did (2022 release) and DOMINE databases. As a result, domains/SLiMs are identified by their Pfam ID, and interactions are determined according to the appropriate algorithm implemented in the R script.
+This tool takes advantage of a compiled dataset of domain-domain interactions from the 3did (2022 release) and DOMINE databases. As a result, domains are identified by their Pfam ID, and domain-SLiM interactions are provided by the Eukaryotic Linear Motif (ELM) Database. Potential interactions are determined according to the appropriate algorithm implemented in the R script.
 
 ## To Use
 One is able to run this Shiny app from RStudios. To use, simply download the ddip.r script as well as the compiled_interactions.csv and interaction_id.tsv files. Copy and paste the file path name at the appropriate spot in the script, which will be annotated in-script for ease of identification. Afterwards, one is able to run the entire script to use the tool. I am currently working on getting the tool published on a server so that anyone can access the app directly from a link, without having to execute any code on RStudios.
