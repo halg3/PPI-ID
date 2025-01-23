@@ -14,7 +14,7 @@ library(jsonlite)
 # Paste path name to compiled_interactions.csv here
 compiled_interactions = read.csv("path/to/file")
 
-# Paste path name to domain_motif_interactions.tsv here
+# Paste path name to interaction_id.tsv here
 domain_motif_interactions = read_tsv("path/to/file")
 
 # Paste path name to elm_classes.tsv here
@@ -1534,7 +1534,7 @@ server <- function(input, output, session){
       # Increment process
       incProgress(0.5, detail = "Fetching protein data...")
       
-      if(input$prot1TypeAcc == "Domain" && input$prot2TypeAcc == "Domain"){
+      if(input$prot1TypeAcc == "Domain" && input$prot2TypeAcc == "Domain"){ # Protein 1 - Domain. Protein 2 - Domain.
         error_message_acc(NULL)
         
         protein1_acc(interpro_api(accession1()))
@@ -1550,11 +1550,11 @@ server <- function(input, output, session){
           results_acc(interpro_algo_accession(protein1_acc(), protein2_acc()))
         }
         
-      } else if(input$prot1TypeAcc == "Domain" && input$prot2TypeAcc == "Motif"){
+      } else if(input$prot1TypeAcc == "Domain" && input$prot2TypeAcc == "Motif"){ # Protein 1 = Domain. Protein 2 = Motif
         error_message_acc(NULL)
         
         protein1_acc(interpro_api(accession1()))
-        protein2_acc(generate_motif_table(accession2()))
+        protein2_acc(generate_motif_table(accession2(), "accession"))
         protein2_acc(protein2_acc()[[2]])
         
         print(protein1_acc())
@@ -1573,7 +1573,7 @@ server <- function(input, output, session){
       } else if(input$prot1TypeAcc == "Motif" && input$prot2TypeAcc == "Domain"){
         error_message_acc(NULL)
         
-        protein1_acc(generate_motif_table(accession1()))
+        protein1_acc(generate_motif_table(accession1(), "accession"))
         protein1_acc(protein1_acc()[[2]])
         protein2_acc(interpro_api(accession2()))
         print(protein1_acc())
@@ -2994,4 +2994,5 @@ server <- function(input, output, session){
   )
 }
 
+# Run app
 shinyApp(ui = ui, server = server)
