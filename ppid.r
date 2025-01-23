@@ -1,4 +1,3 @@
-# Correct version
 library(shiny)
 library(shinyjs)
 library(shinycssloaders)
