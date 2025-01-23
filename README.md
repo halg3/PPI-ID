@@ -6,7 +6,7 @@ After running predictions on AlphaFold, the user is able to upload the resulting
 
 This tool takes advantage of a compiled dataset of domain-domain interactions from the 3did (2022 release) and DOMINE databases. As a result, domains are identified by their Pfam ID, and domain-SLiM interactions are provided by the Eukaryotic Linear Motif (ELM) Database. Potential interactions are determined according to the appropriate algorithm implemented in the R script.
 
-The web version of this tool can be accessed at the following link, http://ppi-id.biosci.utexas.edu:7215/.
+The web version of this tool can be accessed at the following link: http://ppi-id.biosci.utexas.edu:7215/.
 
 ## To Use
 One is able to run this Shiny app from RStudios. To use, simply download the ppi-id.R script as well as the compiled_interactions.csv and interaction_id.tsv files. Copy and paste the file path name at the appropriate spot in the script, which will be annotated in-script for ease of identification. Afterwards, one is able to run the entire script to use the tool. I am currently working on getting the tool published on a server so that anyone can access the app directly from a link, without having to execute any code on RStudios.
