@@ -1,0 +1,116 @@
+Supplementary Table 1,,,,,,,,,,,
+"DMI validation information. In the Bottom-Up and Top-Down columns, a 1 corresponds with a successful prediction, and 0 corresponds with a failed prediction.",,,,,,,,,,,
+,,,,,,,,,,,
+Receptor,Ligand,ELM Identifier,ELM Rec Start,ELM Rec Stop,ELM Lig Start,ELM Lig Stop,Protein 1 Length,Protein 2 Length,Bottom-Up,Top-Down,"PDB Crystal Structure ID Numbers, PPI-ID output was compared to these."
+Q14289,P49023,LIG_FAT_LD_1,870,1008,266,274,1009,591,1,0,3u3f
+Q9DBG9,P35222,LIG_PDZ_Class_1,17,110,776,781,124,781,1,1,3diw
+P18564,P01137,LIG_Integrin_RGD_TGFB_3,128,375,244,250,788,390,1,1,5ffo
+P12004,P26358,LIG_PCNA_PIPBox_1,127,254,164,173,261,1616,1,1,6k3a
+P68135,Q9U1K1,LIG_Actin_WH2_1,4,377,464,480,377,1020,1,1,3ue5
+P18564,P10600,LIG_Integrin_RGD_TGFB_3,128,375,261,267,788,412,1,1,4um9
+Q96RT1,P04626,LIG_PDZ_Class_2,1321,1407,1250,1255,1412,1255,1,0,1mfl
+O14936,O35430,LIG_CaMK_CASK_1,12,276,378,384,926,839,1,1,6kmh
+P06730,Q13542,LIG_eIF4E_1,38,200,54,60,217,120,1,1,3am7
+O00255,P17535,LIG_Menin_MBM1_1,1,614,27,36,610,347,1,0,3u86
+P35568,P24394,LIG_PTB_Phospho_1,160,262,491,497,1242,825,1,0,1irs
+O95166,O75385,LIG_LIR_Gen_1,13,116,356,365,117,1050,1,1,6hyo
+Q13362,O60566,DOC_PP2A_KARD_1,27,438,668,680,524,1050,0,0,5swf
+P11940,Q9HCJ0,LIG_PAM2_2,543,614,1385,1398,636,1936,1,1,3ktp
+P62207,Q90623,DOC_PP1_MyPhoNE_1,56,251,10,17,3277,1004,1,1,1s70
+P68135,Q87GE5,LIG_Actin_WH2_2,4,377,135,151,377,484,1,1,3m1f
+Q8WV92,Q9HD42,DOC_MIT_MIM_1,13,77,185,195,249,196,1,1,4a5x
+O75475,Q96ST2,LIG_LEDGF_IBM_1,349,449,473,491,530,819,1,1,6emr
+P97287,Q99ML1,LIG_BH_BH3_1,194,293,133,149,331,193,1,1,2roc
+P68135,Q9Y6W5,LIG_Actin_WH2_1,4,377,437,453,377,498,1,1,2a40
+Q07817,Q92934,LIG_BH_BH3_1,90,188,106,122,233,168,1,1,1g5j
+P14315,Q53GL0,LIG_ActinCP_CPI_1,6,240,150,168,277,409,1,1,3aa1
+O95166,O95197,LIG_LIR_Gen_1,13,116,246,256,117,1032,1,1,7bru
+P63086,P35236,DOC_MAPK_HePTP_8,23,311,38,50,358,360,1,1,2gph
+Q8WUM4,Q02843,LIG_LYPXL_SIV_4,412,701,467,475,868,513,1,0,2xs8
+Q9H492,Q9BQS8,LIG_LIR_Gen_1,15,120,1277,1288,121,1478,1,1,5cx3
+Q9BXW4,Q13137,LIG_LIR_LC3C_4,21,126,132,136,147,446,1,1,3vvw
+O95166,Q99442,LIG_LIR_Gen_1,13,116,362,371,117,399,1,1,7brt
+P55072,Q8TEB9,LIG_VCP_VBM_3,25,108,304,313,806,315,1,1,5epp
+Q9ULZ2,Q9GZY6,LIG_SH2_STAP1,179,256,136,140,295,243,1,0,3maz
+Q9GZQ8,Q96CV9,LIG_LIR_Gen_1,15,120,175,184,125,577,1,1,3vtw
+Q06330,P46531,LIG_CSL_BTD_1,179,328,1767,1770,500,2555,1,1,6py8
+P31751,P31751,DOC_AGCK_PIF_1,152,409,470,475,481,481,1,0,3e8d
+Q9H2K2,P78314,DOC_ANK_TNKS_1,525,557,414,421,1166,561,1,1,3twr
+P18564,Q98W00,LIG_Integrin_RGD_TGFB_3,128,375,145,151,788,213,1,1,5ner
+P08514,P02679-2,LIG_Integrin_KxxGD_FGGC_5,320,362,432,437,1039,437,1,0,2vdr
+P28482,Q9BUB5,DOC_MAPK_RevD_3,25,313,434,448,360,465,1,1,2y9q
+Q07817,Q16611,LIG_BH_BH3_1,90,188,70,86,233,211,1,0,5fmk
+P48598,Q9VMA3,LIG_eIF4E_1,82,242,327,333,259,1117,1,1,4axg
+P14315,Q91YR1,LIG_ActinCP_TwfCPI_2,6,240,323,333,277,350,1,1,7dsb
+,,,,,,,,,,,
+,,,,,,,,,,,
+,,,,,,,,,,,
+,,,,,,,,,,,
+,,,,,,,,,,,
+Supplementary Data Table 2,,,,,,,,,,,
+"DDI validation information. In the Bottom-Up and Top-Down columns, a 1 corresponds with a successful prediction, and 0 corresponds with a failed prediction.",,,,,,,,,,,
+,,,,,,,,,,,
+Protein 1,Protein 2,Domain 1 Start,Domain 1 Stop,Domain 2 start,Domain 2 Stop,Protein 1 Length,Protein 2 Length,Bottom-Up,Top-Down,"PDB Crystal Structure ID Numbers, PPI-ID output was compared to these.",
+Q7CLS3,P0C0F6,69,264,464,578,289,726,1,1,3m6m,
+Q70UR4,Q70UR4,1,441,1,441,482,482,1,1,4akl,
+F7B113,F7B113,28,486,28,486,644,644,1,1,6z3y,
+A6H8Y1,P20226,293,380,162,244,2624,339,1,1,5n9g,
+P62191,P54578,109,163,104,479,440,494,1,0,5gjq,
+Q96NW4,Q13637,516,595,27,194,1050,225,1,1,4cym,
+A0A0H3GMP0,A0A0H3GLZ1,21,161,8,71,177,88,1,1,5zgn,
+V6CLJ5,Q09260,680,776,52,114,790,490,1,1,2fo1,
+P22301,Q13651,11,156,2,90,178,578,1,1,1j7v,
+Q8XAL7,P55211,29,159,163,400,189,416,1,1,3v3k,
+P01139,Q9EPR5,128,238,179,611,241,1159,1,1,6ffy,
+F2K077,F2K074,229,378,11,73,380,376,1,1,6cxt,
+Q7JXB9,Q9V3V9,73,300,31,158,310,359,1,0,3ism,
+Q9P278,Q7L523,73,168,63,289,1114,313,1,0,6ulg,
+Q8TBC4,Q13564,354,916,33,348,463,534,1,1,1r4n,
+Q12315,P20449,258,500,316,434,538,482,1,1,3peu,
+P29459,P29460,20,167,104,194,219,328,1,1,1f45,
+Q13564,Q8TBC4,13,533,103,174,534,463,1,1,3dbh,
+P17379,P22472,1,421,50,1012,420,1019,1,1,1uf2,
+P28632,P06710,2,28,232,363,137,643,1,1,3gli,
+P20796,P22747,853,924,312,541,1444,1053,0,1,6rut,
+A5HZZ5,A5HZZ4,4,146,493,626,146,146,1,1,4qd2,
+P10104,P10104,319,348,319,348,487,487,1,1,1v1h,
+Q7K2L1,Q24168,611,721,280,606,721,618,1,1,7jk2,
+Q55781,Q55389,3,69,10,111,75,118,1,1,2puo,
+P10824,Q80ZG1,50,343,66,482,354,530,1,1,6ukt,
+Q5BBX1,C8VTS4,81,160,130,343,430,369,1,1,4n6r,
+P48729,Q96SW2,17,258,319,436,337,442,1,1,5fqd,
+Q13155,Q15046,2,32,222,574,320,597,1,1,4dpg,
+P00830,P07251,151,374,381,506,511,545,1,1,2hld,
+P0DP23,P29966,82,146,191,208,149,332,1,1,1iwq,
+P31946,Q9I788,11,231,242,431,246,457,1,1,6gnn,
+A7GBG3,P63027,3,410,28,57,1278,116,1,0,3fie,
+P08100,P20443,54,306,200,360,348,403,1,1,4zwj,
+Q5JIH3,Q5JIH4,1,133,17,247,139,248,1,1,5aun,
+H8Z3S2,H8Z0X5,24,331,4,138,396,258,1,1,7c9r,
+Q9Y478,Q13131,195,269,18,269,270,559,1,1,6c9g,
+P04637,P03070,99,289,266,627,393,708,1,0,2h1l,
+P29496,Q03406,25,183,44,177,775,294,1,0,3jc5,
+P20339,Q9UJ41,22,182,268,371,215,491,1,1,4q9u,
+,,,,,,,,,,,
+Reasons for failure:,,,,,,,,,,,
+"BU = Bottom-up
+TD = Top-down
+AF = AlphaFold",,,,,,,,,,,
+Protein 1,Protein 2,Interaction Type,Analysis Type,Reason,,,,,,,
+Q14289,P49023,DMI,TD,AF failed to predict the correct protein-protein interface.,,,,,,,
+Q96RT1,P04626,DMI,TD,AF failed to predict the correct protein-protein interface.,,,,,,,
+O00255,P17535,DMI,TD,AF failed to predict the correct protein-protein interface.,,,,,,,
+P35568,P24394,DMI,TD,AF failed to predict the correct protein-protein interface.,,,,,,,
+Q13362,O60566,DMI,BU/TD,"Unable to locate DOC_PP2A_KARD_1 SLiM in ELM data used in PPI-ID. Because BU failed, TD cannot be completed.",,,,,,,
+Q8WUM4,Q02843,DMI,TD,AF failed to predict the correct protein-protein interface.,,,,,,,
+Q9ULZ2,Q9GZY6,DMI,TD,AF failed to predict the correct protein-protein interface.,,,,,,,
+P31751,P31751,DMI,TD,AF failed to predict the correct protein-protein interface.,,,,,,,
+P08514,P02679-2,DMI,TD,AF failed to predict the correct protein-protein interface.,,,,,,,
+Q07817,Q16611,DMI,TD,AF failed to predict the correct protein-protein interface.,,,,,,,
+P62191,P54578,DDI,TD,AF failed to predict the correct protein-protein interface. Proteins come from a much larger complex that contains 32 polypeptides.,,,,,,,
+Q7JXB9,Q9V3V9,DDI,TD,InterPro domain identification fails to identify the correct interaction domain.,,,,,,,
+Q9P278,Q7L523,DDI,TD,AF failed to predict the correct protein-protein interface. Proteins come from a larger complex that contains 9 polypeptides,,,,,,,
+P20796,P22747,DDI,BU,"InterPro domain identification fails to identify the correct interaction domain, so BU fails.",,,,,,,
+A7GBG3,P63027,DDI,TD,AF failed to predict the correct protein-protein interface.,,,,,,,
+P04637,P03070,DDI,TD,AF failed to predict the correct protein-protein interface. Proteins come from a larger complex that contains 3 polypeptides,,,,,,,
+P29496,Q03406,DDI,TD,AF failed to predict the correct protein-protein interface. Proteins come from a larger complex that contains 11 polypeptides,,,,,,,
