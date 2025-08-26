@@ -1,0 +1,86 @@
+---
+title: "PPI-ID DDI Compilation"
+format: html
+editor: visual
+author: Haley Goodwin
+---
+
+# PPI-ID DDI Compilation
+
+[The Protein-Protein Interaction Identifier](http://ppi-id.biosci.utexas.edu:7215) (PPI-ID) is a structural bioinformatics web-tool for predicting and identifying protein-protein interactions (PPIs). Predicting/identifying interactions requires a database of domain-domain interactions (DDIs). The PPI-ID database of compiles DDI information from two sources, [DOMINE](https://manticore.niehs.nih.gov/cgi-bin/Domine?page=help) and [3did](https://3did.irbbarcelona.org).
+
+As of June 2025, the PPI-ID database contains 40,535 DDIs. Occasionally, this database may need to be updated as sources (e.g. DOMINE and 3did) document more DDIs. This script provides a step-by-step basis for the user to smoothly update the PPI-ID DDI database.
+
+## 1. Download DDI information from source databases
+
+The DOMINE download page can be found [here](https://manticore.niehs.nih.gov/cgi-bin/Domine?page=download). As of June 2025, the latest DOMINE database version available is the Sept. 2010 release.
+
+The 3did download page can be found [here](https://3did.irbbarcelona.org/download.php). As of June 2025, the latest 3did database version available is the Mar. 2025 release. The Mar. 3, 2025 release was downloaded by clicking the **3did_flat.gz** file that is found under the "Flat data files" section of the [Download page](https://3did.irbbarcelona.org/download.php). The date of 3did release is found within the file name when the **3did_flat.gz** file is downloaded.
+
+## 2. Upload DDI information
+
+-   DOMINE will download a zip file. Paste the file path to the file named **INTERACTION.txt**.
+
+    -   As of June 2025, the Sept. 2010 release of DOMINE data is stored as a txt file. The data in this file is separated by pipe ("\|") characters. If in the future the delimiter changes, you will need to alter the read.table() function. If the delimiter is a tab, you will need to set `sep = "\t"`. If the delimiter is a comma, you will need to set `sep = ","`. Furthermore, the Sep. 2010 release of DOMINE INTERACTION.txt data does not contain headers. Hence, `header = FALSE` in the chunk below. If that changes in the future, just set `header = TRUE`.
+
+    -   As of June 2025, **3did_flat.gz** downloads as **3did_flat_Mar_3_2025.dat**, downloading as a .dat file with the release date in the file name. There is a lot of data in the 3did file, so be patient as it fully uploads.
+
+```{r}
+raw_domine = read.table("/Users/haleygoodwin/Downloads/PPI-ID/Databases/domine-tables-2/INTERACTION.txt", sep = "|", header = FALSE, stringsAsFactors = FALSE) # Paste file path to DOMINE data here.
+
+raw_3did = readLines("/Users/haleygoodwin/Downloads/PPI-ID/Databases/3did_flat_Mar_3_2025.dat") # Paste file path to 3did data here. This will format as a large character object.
+```
+
+## 3. Clean DOMINE DDIs
+
+The code to clean the DOMINE data is quite clean because DOMINE data is organized simply.
+
+```{r}
+cleaned_domine = raw_domine[,1:2]
+colnames(cleaned_domine) <- c("domain_1", "domain_2")
+```
+
+## 4. Clean 3did DDIs
+
+Once again, because there is so much information stored in the raw_3did file, please allow the grep() function some time to completely run.
+
+Tip: it is a good idea to check the [3did statistics](https://3did.irbbarcelona.org/statistics.php) and make sure that the number of observations documented in raw_3did_df is equal to the number of DDIs documented in the 3did database.
+
+```{r}
+raw_3did = grep("^#=ID", raw_3did, value = TRUE) # Domain identities of interacting domains are stored in lines that begin with "#=ID", so we are interesting in extracting only those lines.
+
+raw_3did_df = read.delim(text = raw_3did, header = FALSE, sep = "\t", stringsAsFactors = FALSE) # Store extracted DDI information lines as a data frame.
+
+# Format column containing Pfam ID for one domain
+raw_3did_df$V4 = substr(raw_3did_df$V4, 3, nchar(raw_3did_df$V4))
+raw_3did_df$V4 = sapply(strsplit(raw_3did_df$V4, split = "[.]"), `[`, 1)
+
+# Format column containing Pfam ID for the other domain
+raw_3did_df$V5 = sapply(strsplit(raw_3did_df$V5, split = "[.]"), `[`, 1)
+
+cleaned_3did = raw_3did_df[,4:5]
+colnames(cleaned_3did) <- c("domain_1", "domain_2")
+```
+
+## 5. Compile sources into one CSV
+
+```{r}
+compiled_interactions = rbind(cleaned_domine, cleaned_3did)
+```
+
+## 6. Get rid of duplicates
+
+```{r}
+# Creates two additional columns that place Pfam IDs in numerical order. This ensures that duplicates are symmetrically removed.
+compiled_interactions$pfam_min <- pmin(compiled_interactions$domain_1, compiled_interactions$domain_2)
+compiled_interactions$pfam_max <- pmax(compiled_interactions$domain_1, compiled_interactions$domain_2)
+
+compiled_interactions <- unique(compiled_interactions[, c("pfam_min", "pfam_max")]) # Keep unique rows, based on pfam_min and pfam_max values.
+colnames(compiled_interactions) <- c("domain_1", "domain_2") # Rename the columns.
+```
+
+## 7. Download CSV
+
+```{r}
+write.csv(compiled_interactions, "/Users/haleygoodwin/Downloads/PPI-ID/Databases/compiled_interactions.csv", row.names = FALSE)
+```
